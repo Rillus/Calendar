@@ -161,7 +161,9 @@ function findSegmentByColour(clickedCol) {
 		//console.log(clickedCol, colours[0]);
 		if (colours[i] == rgbToHex(clickedCol)){
 			return labels[i];
+			break;
 		}
+		//return "undefined";
 	}
 }
 
@@ -242,7 +244,7 @@ function init(){
 			
 		
 		segment = findSegmentByColour(clickedCol);
-		if (segment != "undefined"){
+		if (segment != undefined){
 			console.log(clickedCol, segment);
 			writeSegmentName(segment);
 		}
