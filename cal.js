@@ -7,6 +7,9 @@ var canvas = document.getElementById("canvas"),
 	
 	calendarType = "year",
 	segments = 12,
+	centerX = Math.floor(canvas.width / 2),
+	centerY = Math.floor(canvas.height / 2),
+
 	summer = [255, 242, 0],
 	spring = [0, 241, 0],
 	autumn = [255, 170, 0],
@@ -81,12 +84,34 @@ function colourSum(colour1, colour2, steps, thisStep){
 /*********************/
 /* drawing functions */
 /*********************/
+function drawCalendar(){
+	for(i = 0; i < segments; i++){
+		if (thisColourStep < colourSteps){
+			thisColourStep++;
+		} else {
+			thisSeason++;
+			thisColourStep = 1;
+		}
+		nextSeason = thisSeason +1;
+		if (nextSeason > seasons.length-1){
+			nextSeason = 0;
+		}
+		newColour = colourSum(seasons[thisSeason], seasons[nextSeason], colourSteps, thisColourStep);
+		newColour = rgbToHex(newColour);
+		
+		data.push(deg);
+		colours.push(newColour);
+		
+		drawSegment(canvas, context, i);
+		
+		assignLabels();
+		drawSegmentLabel(canvas, context, i);
+	}
+}
 
 function drawCircle(){
 	context.save();
-	var centerX = Math.floor(canvas.width / 2),
-		centerY = Math.floor(canvas.height / 2),
-		radius = Math.floor(canvas.width /3),
+	var radius = Math.floor(canvas.width /3),
 		startingAngle = degreesToRadians(sumTo(data, i))
 		arcSize = degreesToRadians(data[i])
 		endingAngle = startingAngle + arcSize;
@@ -103,9 +128,7 @@ function drawCircle(){
 }
 function drawSegment(canvas, context, i) {
     context.save();
-    var centerX = Math.floor(canvas.width / 2);
-    var centerY = Math.floor(canvas.height / 2);
-    radius = Math.floor(canvas.width / 2);
+    var radius = Math.floor(canvas.width / 2);
 
     var startingAngle = -degreesToRadians(sumTo(data, i))+45,
 		arcSize = degreesToRadians(data[i]),
@@ -144,16 +167,15 @@ function drawSegmentLabel(canvas, context, i) {
 function writeSegmentName(segment){
 	drawCircle();
 	
-	var x = Math.floor(canvas.width / 2),
-		y = Math.floor(canvas.height / 2);
+	var fontSize = Math.floor(canvas.height / 5)
+		x = Math.floor(canvas.width / 2),
+		y = Math.floor(canvas.height / 2 + (fontSize/2));
 	
 	//context.translate(x, y);	
 	context.textAlign = "center";
-	var fontSize = Math.floor(canvas.height / 45);
 	context.font = fontSize + "pt Helvetica";
 	
 	context.fillText(segment, x, y);
-	
 }
 
 function findSegmentByColour(clickedCol) {
@@ -163,7 +185,6 @@ function findSegmentByColour(clickedCol) {
 			return labels[i];
 			break;
 		}
-		//return "undefined";
 	}
 }
 
@@ -205,29 +226,7 @@ function assignLabels(){
 /********/
 
 function init(){
-	for(i = 0; i < segments; i++){
-		if (thisColourStep < colourSteps){
-			thisColourStep++;
-		} else {
-			thisSeason++;
-			thisColourStep = 1;
-		}
-		nextSeason = thisSeason +1;
-		if (nextSeason > seasons.length-1){
-			nextSeason = 0;
-		}
-		newColour = colourSum(seasons[thisSeason], seasons[nextSeason], colourSteps, thisColourStep);
-		newColour = rgbToHex(newColour);
-		
-		data.push(deg);
-		colours.push(newColour);
-		
-		drawSegment(canvas, context, i);
-		
-		assignLabels();
-		drawSegmentLabel(canvas, context, i);
-		//console.log ('colour: ', newColour, 'season: ', thisSeason, 'steps: ', colourSteps, 'this step: ', thisColourStep)
-	}
+	drawCalendar();
 	
 	drawCircle();
 	
@@ -236,17 +235,20 @@ function init(){
 			clickedCol = [clicked[0], clicked[1], clicked[2]];
 			
 		segment = findSegmentByColour(clickedCol);
+		if (segment != undefined){
+			writeSegmentName(segment);
+		}
 	}
 	
 	document.getElementById('canvas').onmousemove = function(event) {
 		var clicked = context.getImageData(event.clientX, event.clientY, 1, 1).data,
 			clickedCol = [clicked[0], clicked[1], clicked[2]];
 			
-		
 		segment = findSegmentByColour(clickedCol);
 		if (segment != undefined){
-			console.log(clickedCol, segment);
 			writeSegmentName(segment);
+		} else {
+			drawCircle();
 		}
 	}
 	
