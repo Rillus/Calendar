@@ -1,0 +1,80 @@
+# Circular Calendar Project Rules
+
+## Project Context
+
+This is a circular calendar visualisation built with vanilla JavaScript and SVG. The project uses ES6 modules and requires a local web server to run.
+
+## Architecture Principles
+
+1. **Modular Structure**: Code is split into focused modules:
+   - `config.js` - Constants and configuration only
+   - `colorUtils.js` - Colour conversion utilities
+   - `mathUtils.js` - Mathematical helper functions
+   - `svgUtils.js` - SVG path creation
+   - `calendarRenderer.js` - Rendering logic
+   - `cal.js` - Initialisation and orchestration
+
+2. **Single Responsibility**: Each module should have one clear purpose
+
+3. **ES6 Modules**: Always use `import`/`export` syntax. Never bundle unless explicitly requested.
+
+4. **No External Dependencies**: Keep the project dependency-free. If D3.js is needed later, it will be added explicitly.
+
+## Code Style
+
+- **Language**: Use British English spelling (colour, centre, visualisation, etc.)
+- **Variables**: Use `const` and `let`, never `var`
+- **Functions**: Prefer arrow functions for callbacks, regular functions for main logic
+- **Naming**: Use descriptive, camelCase names
+- **Comments**: Comment complex logic, especially mathematical operations
+
+## File Organisation
+
+- Keep related functionality together
+- Export only what's needed from each module
+- Import only what you use
+- Maintain clear separation between utilities and rendering logic
+
+## SVG Best Practices
+
+- Use SVG elements, not Canvas
+- Leverage SVG's DOM structure for interactivity
+- Use `viewBox` for responsiveness
+- Keep paths and transformations efficient
+
+## Testing Considerations
+
+- Code must work with a local web server (ES6 modules requirement)
+- Test in modern browsers (Chrome, Firefox, Safari, Edge)
+- Ensure responsive design works at different viewport sizes
+
+## When Adding Features
+
+1. **Zoom Levels**: Plan for year → month → week → day navigation
+2. **D3.js Integration**: When adding D3.js, maintain the existing SVG structure
+3. **Date Information**: Consider how to display dates at different zoom levels
+4. **Performance**: Keep rendering efficient, especially with many segments
+
+## Common Patterns
+
+- Calendar state (data, labels, colours) lives in `calendarRenderer.js`
+- Mathematical calculations go in `mathUtils.js`
+- Colour operations go in `colorUtils.js`
+- SVG path generation goes in `svgUtils.js`
+- Configuration changes go in `config.js`
+
+## Avoid
+
+- Bundling code unless explicitly requested
+- Adding unnecessary dependencies
+- Mixing concerns (e.g., math in renderer, rendering in utils)
+- Breaking the modular structure
+- Using Canvas instead of SVG
+
+## Future Considerations
+
+- D3.js will be added for custom interactivities as needed
+- Zoom levels will require state management
+- Date information will need a data structure
+- Events/calendar data will need integration points
+
