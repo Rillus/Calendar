@@ -31,5 +31,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Verify build artefacts are committed
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Working tree is dirty after build. Please run 'npm run build' and commit dist/ output."
+            git status --porcelain
+            git diff
+            exit 1
+          fi
+
       - name: Run tests
         run: npm test

@@ -10,13 +10,13 @@ export async function buildWebComponentBundle({
   entryPoint = defaultEntryPoint,
   outfile = defaultOutfile,
   minify = true,
-  sourcemap = true
+  sourcemap = false
 } = {}) {
   const esbuild = await import('esbuild');
 
   await fs.mkdir(path.dirname(outfile), { recursive: true });
 
-  return esbuild.build({
+  const result = await esbuild.build({
     entryPoints: [entryPoint],
     outfile,
     bundle: true,
@@ -27,6 +27,13 @@ export async function buildWebComponentBundle({
     sourcemap,
     legalComments: 'none'
   });
+
+  // Avoid leaving stale sourcemaps around when sourcemap=false.
+  if (!sourcemap) {
+    await fs.rm(`${outfile}.map`, { force: true });
+  }
+
+  return result;
 }
 
 const isDirectRun =

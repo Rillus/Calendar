@@ -177,6 +177,7 @@ npm run build
 ```
 
 This outputs `dist/circular-calendar.min.js` (gitignored). When loaded, it **auto-defines** the `<circular-calendar>` element.
+This outputs `dist/circular-calendar.min.js` (committed). When loaded, it **auto-defines** the `<circular-calendar>` element.
 
 Example:
 

@@ -192,7 +192,6 @@ $RECYCLE.BIN/
 # Packages
 *.egg
 *.egg-info
-dist/
 build/
 eggs/
 parts/
@@ -231,7 +230,6 @@ coverage/
 *.lcov
 
 # Build outputs
-dist/
 build/
 *.tsbuildinfo
 
