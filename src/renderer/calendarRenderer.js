@@ -19,9 +19,9 @@ import {
 } from '../config/config.js';
 import { rgbToHex } from '../utils/colorUtils.js';
 import { degreesToRadians, sumTo, polarToCartesian } from '../utils/mathUtils.js';
-import { createArcPath } from '../utils/svgUtils.js';
+import { createArcPath, createMoonIlluminatedPath } from '../utils/svgUtils.js';
 import { getDaysInMonth } from '../utils/dateUtils.js';
-import { getMoonPhaseAngle, getMoonPhaseName } from '../utils/moonPhase.js';
+import { getMoonPhase, getMoonPhaseAngle, getMoonPhaseName } from '../utils/moonPhase.js';
 
 // Calendar state
 const data = [];
@@ -345,6 +345,7 @@ export function showSunAndMoonForDate(date) {
     const sunPos = polarToCartesian(centerX, centerY, sunRadius, normalizedAngle);
     
     // Calculate moon phase for this specific date
+    const moonPhase = getMoonPhase(date);
     const moonPhaseAngle = getMoonPhaseAngle(date);
     
     // Moon position: sun angle - moon phase angle
@@ -354,7 +355,7 @@ export function showSunAndMoonForDate(date) {
     const moonRadius = radius + moonDistance;
     const moonPos = polarToCartesian(centerX, centerY, moonRadius, moonAngle);
     
-    showSunAndMoon(sunPos, moonPos, true);
+    showSunAndMoon(sunPos, moonPos, true, moonPhase);
 }
 
 // Selects a specific date (used by external views, e.g. month view)
@@ -438,6 +439,7 @@ function handleMonthHover(event, monthIndex) {
     
     // Calculate moon phase for the specific day under cursor
     const moonDate = new Date(currentYear, monthIndex, dayInMonth);
+    const moonPhase = getMoonPhase(moonDate);
     const moonPhaseAngle = getMoonPhaseAngle(moonDate);
     
     // Moon position: sun angle - moon phase angle
@@ -446,11 +448,11 @@ function handleMonthHover(event, monthIndex) {
     const moonRadius = radius + moonDistance;
     const moonPos = polarToCartesian(centerX, centerY, moonRadius, moonAngle);
     
-    showSunAndMoon(sunPos, moonPos);
+    showSunAndMoon(sunPos, moonPos, false, moonPhase);
 }
 
 // Creates or updates sun and moon SVG elements
-function showSunAndMoon(sunPos, moonPos, makeDraggable = false) {
+function showSunAndMoon(sunPos, moonPos, makeDraggable = false, moonPhase = null) {
     // Remove existing elements
     hideSunAndMoon();
     
@@ -491,18 +493,35 @@ function showSunAndMoon(sunPos, moonPos, makeDraggable = false) {
     sunCircle.setAttribute("stroke-width", "1");
     sunGroup.appendChild(sunCircle);
     
-    // Create moon icon (circle)
-    const moonCircle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    moonCircle.setAttribute("cx", moonPos[0]);
-    moonCircle.setAttribute("cy", moonPos[1]);
-    moonCircle.setAttribute("r", "6");
-    moonCircle.setAttribute("fill", "#e0e0e0");
-    moonCircle.setAttribute("stroke", "#999");
-    moonCircle.setAttribute("stroke-width", "1");
-    moonCircle.setAttribute("class", "moon-icon");
+    // Create moon icon (dark disc with illuminated overlay)
+    const moonGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    moonGroup.setAttribute("class", "moon-icon");
+    moonGroup.setAttribute("transform", `translate(${moonPos[0]}, ${moonPos[1]})`);
+
+    const moonRadius = 6;
+
+    const moonBase = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    moonBase.setAttribute("cx", "0");
+    moonBase.setAttribute("cy", "0");
+    moonBase.setAttribute("r", String(moonRadius));
+    moonBase.setAttribute("fill", "#111");
+    moonBase.setAttribute("stroke", "#999");
+    moonBase.setAttribute("stroke-width", "1");
+    moonBase.setAttribute("class", "moon-icon__base");
+    moonGroup.appendChild(moonBase);
+
+    const phaseValue = Number.isFinite(Number(moonPhase)) ? Number(moonPhase) : 0;
+    const illuminatedPath = createMoonIlluminatedPath(0, 0, moonRadius, phaseValue);
+    if (illuminatedPath) {
+        const lit = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        lit.setAttribute("d", illuminatedPath);
+        lit.setAttribute("fill", "#f5f5f5");
+        lit.setAttribute("class", "moon-icon__lit");
+        moonGroup.appendChild(lit);
+    }
     
     svg.appendChild(sunGroup);
-    svg.appendChild(moonCircle);
+    svg.appendChild(moonGroup);
     
     // Add drag handlers if draggable
     if (makeDraggable) {
@@ -619,6 +638,7 @@ function setupSunDragHandlers(sunGroup) {
         const sunPos = polarToCartesian(centerX, centerY, sunRadius, angle);
         
         const moonPhaseAngle = getMoonPhaseAngle(date);
+        const moonPhase = getMoonPhase(date);
         const moonAngle = angle - moonPhaseAngle;
         const moonRadius = radius + moonDistance;
         const moonPos = polarToCartesian(centerX, centerY, moonRadius, moonAngle);
@@ -626,11 +646,26 @@ function setupSunDragHandlers(sunGroup) {
         // Update sun position
         sunGroup.setAttribute("transform", `translate(${sunPos[0]}, ${sunPos[1]})`);
         
-        // Update moon position
-        const moonCircle = svg.querySelector('.moon-icon');
-        if (moonCircle) {
-            moonCircle.setAttribute("cx", moonPos[0]);
-            moonCircle.setAttribute("cy", moonPos[1]);
+        // Update moon position + phase shading
+        const moonGroup = svg.querySelector('.moon-icon');
+        if (moonGroup) {
+            moonGroup.setAttribute("transform", `translate(${moonPos[0]}, ${moonPos[1]})`);
+
+            const moonIconRadius = 6;
+            const illuminatedPath = createMoonIlluminatedPath(0, 0, moonIconRadius, moonPhase);
+            const existingLit = moonGroup.querySelector?.('.moon-icon__lit');
+
+            if (!illuminatedPath) {
+                if (existingLit) existingLit.remove();
+            } else if (existingLit) {
+                existingLit.setAttribute('d', illuminatedPath);
+            } else {
+                const lit = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                lit.setAttribute("d", illuminatedPath);
+                lit.setAttribute("fill", "#f5f5f5");
+                lit.setAttribute("class", "moon-icon__lit");
+                moonGroup.appendChild(lit);
+            }
         }
     };
     

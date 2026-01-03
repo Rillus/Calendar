@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createArcPath } from '../src/utils/svgUtils.js';
+import { createArcPath, createMoonIlluminatedPath } from '../src/utils/svgUtils.js';
 
 describe('svgUtils', () => {
   describe('createArcPath', () => {
@@ -86,6 +86,46 @@ describe('svgUtils', () => {
       const validCommands = ['M', 'L', 'A', 'Z'];
       const hasValidCommand = validCommands.some(cmd => path.includes(cmd));
       expect(hasValidCommand).toBe(true);
+    });
+  });
+
+  describe('createMoonIlluminatedPath', () => {
+    it('should return null for new moon (phase 0)', () => {
+      const d = createMoonIlluminatedPath(0, 0, 10, 0);
+      expect(d).toBe(null);
+    });
+
+    it('should return null for new moon again (phase 1)', () => {
+      const d = createMoonIlluminatedPath(0, 0, 10, 1);
+      expect(d).toBe(null);
+    });
+
+    it('should return a non-empty path for first quarter (phase 0.25)', () => {
+      const d = createMoonIlluminatedPath(0, 0, 10, 0.25);
+      expect(typeof d).toBe('string');
+      expect(d.length).toBeGreaterThan(0);
+      // Quarter moon terminator should be a straight line (rx ~= 0)
+      expect(d).toContain('A 0 10');
+    });
+
+    it('should return a non-empty path for last quarter (phase 0.75)', () => {
+      const d = createMoonIlluminatedPath(0, 0, 10, 0.75);
+      expect(typeof d).toBe('string');
+      expect(d.length).toBeGreaterThan(0);
+      expect(d).toContain('A 0 10');
+    });
+
+    it('should return a circle-like path for full moon (phase 0.5)', () => {
+      const d = createMoonIlluminatedPath(0, 0, 10, 0.5);
+      expect(typeof d).toBe('string');
+      expect(d).toContain('A 10 10');
+      expect(d.trim().endsWith('Z')).toBe(true);
+    });
+
+    it('should treat negative phases as wrapping around', () => {
+      const d1 = createMoonIlluminatedPath(0, 0, 10, -0.5);
+      const d2 = createMoonIlluminatedPath(0, 0, 10, 0.5);
+      expect(d1).toBe(d2);
     });
   });
 });
