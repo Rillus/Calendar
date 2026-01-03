@@ -357,6 +357,16 @@ export function showSunAndMoonForDate(date) {
     showSunAndMoon(sunPos, moonPos, true);
 }
 
+// Selects a specific date (used by external views, e.g. month view)
+export function selectDate(date) {
+    const safeDate = new Date(date.getTime());
+    const monthIndex = safeDate.getMonth();
+
+    showSunAndMoonForDate(safeDate);
+    writeSegmentName(labels[monthIndex] ?? months[monthIndex], safeDate);
+    notifyDateChanged(safeDate);
+}
+
 // Shows sun and moon based on mouse position and moon phase
 function handleMonthHover(event, monthIndex) {
     // Get mouse position relative to SVG viewBox coordinates

@@ -3,7 +3,7 @@
 /********/
 
 import { svgSize } from './config/config.js';
-import { initRenderer, drawCalendar, drawCircle, setYear, showSunAndMoonForDate, subscribeToDateChanges } from './renderer/calendarRenderer.js';
+import { initRenderer, drawCalendar, drawCircle, setYear, showSunAndMoonForDate, subscribeToDateChanges, selectDate } from './renderer/calendarRenderer.js';
 import { renderMonthView } from './renderer/monthViewRenderer.js';
 
 function init() {
@@ -42,13 +42,34 @@ function init() {
     yearInput.value = currentYear;
     setYear(currentYear);
 
+    const handleMonthViewSelectDate = (date) => {
+        const year = date.getFullYear();
+        const currentYearValue = parseInt(yearInput.value, 10);
+        if (year !== currentYearValue) {
+            yearInput.value = year;
+            setYear(year);
+            drawCalendar();
+            drawCircle();
+        }
+
+        selectDate(date);
+    };
+
+    const renderMonthViewWithInteractions = (date) => {
+        renderMonthView(monthViewContainer, date, {
+            weekStartsOn: 1,
+            locale: 'en-GB',
+            onSelectDate: handleMonthViewSelectDate
+        });
+    };
+
     // Render month view (defaults to current month)
     const today = new Date();
-    renderMonthView(monthViewContainer, today, { weekStartsOn: 1, locale: 'en-GB' });
+    renderMonthViewWithInteractions(today);
 
     // Keep month view in sync with circular calendar's current date
     subscribeToDateChanges((date) => {
-        renderMonthView(monthViewContainer, date, { weekStartsOn: 1, locale: 'en-GB' });
+        renderMonthViewWithInteractions(date);
     });
     
     // Handle year changes
