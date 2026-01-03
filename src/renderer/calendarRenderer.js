@@ -21,7 +21,7 @@ import { rgbToHex } from '../utils/colorUtils.js';
 import { degreesToRadians, sumTo, polarToCartesian } from '../utils/mathUtils.js';
 import { createArcPath } from '../utils/svgUtils.js';
 import { getDaysInMonth } from '../utils/dateUtils.js';
-import { getMoonPhaseAngle } from '../utils/moonPhase.js';
+import { getMoonPhaseAngle, getMoonPhaseName } from '../utils/moonPhase.js';
 
 // Calendar state
 const data = [];
@@ -116,10 +116,16 @@ export function drawCalendar() {
         path.style.cursor = "pointer";
         
         // Add event handlers
-        path.addEventListener("click", () => writeSegmentName(labels[i]));
+        path.addEventListener("click", (e) => {
+            const dayInMonth = Math.floor(getDaysInMonth(i, currentYear) / 2);
+            const date = new Date(currentYear, i, dayInMonth);
+            writeSegmentName(labels[i], date);
+        });
         path.addEventListener("mouseenter", (e) => {
             e.target.setAttribute("fill", hoverColourHex);
-            writeSegmentName(labels[i]);
+            const dayInMonth = Math.floor(getDaysInMonth(i, currentYear) / 2);
+            const date = new Date(currentYear, i, dayInMonth);
+            writeSegmentName(labels[i], date);
         });
         path.addEventListener("mousemove", (e) => {
             handleMonthHover(e, i);
@@ -208,29 +214,94 @@ export function drawCircle() {
     svg.appendChild(circle);
 }
 
-// Writes segment name in the center
-export function writeSegmentName(segment) {
+// Writes segment name and date in the center
+export function writeSegmentName(segment, date = null) {
     drawCircle();
     
-    // Remove existing center text
-    const existingText = svg.querySelector('.center-text');
-    if (existingText) {
-        existingText.remove();
+    // Remove existing center text elements
+    const existingTexts = svg.querySelectorAll('.center-text');
+    existingTexts.forEach(text => text.remove());
+    
+    // Font sizes
+    const mainFontSize = 16;
+    const smallFontSize = 10;
+    const lineSpacing = 6;
+    
+    // Calculate vertical positions
+    const mainY = centerY;
+    const dayOfWeekY = mainY - (mainFontSize / 2) - lineSpacing;
+    const yearY = mainY + (mainFontSize / 2) + lineSpacing;
+    
+    // Day of week (above, smaller)
+    if (date) {
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const dayOfWeek = dayNames[date.getDay()];
+        
+        const dayText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        dayText.setAttribute("x", centerX);
+        dayText.setAttribute("y", dayOfWeekY);
+        dayText.setAttribute("text-anchor", "middle");
+        dayText.setAttribute("dominant-baseline", "middle");
+        dayText.setAttribute("class", "center-text");
+        dayText.textContent = dayOfWeek;
+        dayText.style.fontSize = `${smallFontSize}px`;
+        dayText.style.fontFamily = "Helvetica, Arial, sans-serif";
+        dayText.style.fill = "#333";
+        svg.appendChild(dayText);
     }
     
-    const fontSize = svgSize / 5;
-    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    text.setAttribute("x", centerX);
-    text.setAttribute("y", centerY + (fontSize / 2));
-    text.setAttribute("text-anchor", "middle");
-    text.setAttribute("dominant-baseline", "middle");
-    text.setAttribute("class", "center-text");
-    text.textContent = segment;
-    text.style.fontSize = `${fontSize}px`;
-    text.style.fontFamily = "Helvetica, Arial, sans-serif";
-    text.style.fill = "#333";
+    // Main text: "MONTH" or "MONTH Day"
+    const mainText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    mainText.setAttribute("x", centerX);
+    mainText.setAttribute("y", mainY);
+    mainText.setAttribute("text-anchor", "middle");
+    mainText.setAttribute("dominant-baseline", "middle");
+    mainText.setAttribute("class", "center-text");
     
-    svg.appendChild(text);
+    let textContent = segment;
+    if (date) {
+        const day = date.getDate();
+        textContent = `${segment} ${day}`;
+    }
+    
+    mainText.textContent = textContent;
+    mainText.style.fontSize = `${mainFontSize}px`;
+    mainText.style.fontFamily = "Helvetica, Arial, sans-serif";
+    mainText.style.fill = "#333";
+    svg.appendChild(mainText);
+    
+    // Year (below, smaller)
+    if (date) {
+        const year = date.getFullYear();
+        
+        const yearText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        yearText.setAttribute("x", centerX);
+        yearText.setAttribute("y", yearY);
+        yearText.setAttribute("text-anchor", "middle");
+        yearText.setAttribute("dominant-baseline", "middle");
+        yearText.setAttribute("class", "center-text");
+        yearText.textContent = year.toString();
+        yearText.style.fontSize = `${smallFontSize}px`;
+        yearText.style.fontFamily = "Helvetica, Arial, sans-serif";
+        yearText.style.fill = "#333";
+        svg.appendChild(yearText);
+        
+        // Moon phase (below year, smaller)
+        const moonPhaseName = getMoonPhaseName(date);
+        const moonPhaseY = yearY + smallFontSize + lineSpacing;
+        
+        const moonPhaseText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        moonPhaseText.setAttribute("x", centerX);
+        moonPhaseText.setAttribute("y", moonPhaseY);
+        moonPhaseText.setAttribute("text-anchor", "middle");
+        moonPhaseText.setAttribute("dominant-baseline", "middle");
+        moonPhaseText.setAttribute("class", "center-text");
+        moonPhaseText.textContent = moonPhaseName;
+        moonPhaseText.style.fontSize = `${smallFontSize}px`;
+        moonPhaseText.style.fontFamily = "Helvetica, Arial, sans-serif";
+        moonPhaseText.style.fill = "#666";
+        svg.appendChild(moonPhaseText);
+    }
 }
 
 // Shows sun and moon for a specific date
@@ -244,8 +315,9 @@ export function showSunAndMoonForDate(date) {
     const segmentSize = degreesToRadians(deg);
     
     // Calculate position within segment (0 = start of month, 1 = end of month)
+    // Reverse so days increase clockwise
     const daysInMonth = getDaysInMonth(monthIndex, year);
-    const positionInSegment = (dayInMonth - 1) / daysInMonth;
+    const positionInSegment = 1 - ((dayInMonth - 1) / daysInMonth);
     
     // Calculate angle for this day
     const angleInSegment = positionInSegment * segmentSize;
@@ -264,7 +336,7 @@ export function showSunAndMoonForDate(date) {
     const moonPhaseAngle = getMoonPhaseAngle(date);
     
     // Moon position: sun angle - moon phase angle
-    // The moon orbits counter-clockwise, so it lags behind the sun by the phase angle
+    // As phase increases, moon moves clockwise relative to sun
     // New moon (0°) = same side as sun, Full moon (180°) = opposite side
     const moonAngle = normalizedAngle - moonPhaseAngle;
     const moonRadius = radius + moonDistance;
@@ -328,10 +400,15 @@ function handleMonthHover(event, monthIndex) {
     
     // Calculate day based on position within segment
     // positionInSegment: 0 = start of month (day 1), 1 = end of month
-    const positionInSegment = angleInSegment / segmentSize;
+    // Reverse the position so days increase clockwise (as mouse moves clockwise)
+    const positionInSegment = 1 - (angleInSegment / segmentSize);
     const daysInMonth = getDaysInMonth(monthIndex, currentYear);
     // Map position (0-1) to day (1 to daysInMonth)
     const dayInMonth = Math.max(1, Math.min(daysInMonth, Math.floor(positionInSegment * daysInMonth) + 1));
+    
+    // Update center text with month and date
+    const hoverDate = new Date(currentYear, monthIndex, dayInMonth);
+    writeSegmentName(labels[monthIndex], hoverDate);
     
     // Position sun outside calendar radius
     const sunRadius = radius + sunDistance;
@@ -342,7 +419,7 @@ function handleMonthHover(event, monthIndex) {
     const moonPhaseAngle = getMoonPhaseAngle(moonDate);
     
     // Moon position: sun angle - moon phase angle
-    // The moon orbits counter-clockwise, so it lags behind the sun by the phase angle
+    // As phase increases, moon moves clockwise relative to sun
     const moonAngle = angleToMouse - moonPhaseAngle;
     const moonRadius = radius + moonDistance;
     const moonPos = polarToCartesian(centerX, centerY, moonRadius, moonAngle);

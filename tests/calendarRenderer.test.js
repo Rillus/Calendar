@@ -197,7 +197,8 @@ describe('calendarRenderer', () => {
       writeSegmentName('APR');
       const text = mockSvg.querySelector('.center-text');
       
-      expect(text.style.fontSize).toBe(`${svgSize / 5}px`);
+      // Fixed font size for central text
+      expect(text.style.fontSize).toBe('16px');
       expect(text.style.fontFamily).toBe('Helvetica, Arial, sans-serif');
       expect(text.style.fill).toBe('#333');
     });
