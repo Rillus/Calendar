@@ -34,10 +34,12 @@ describe('circular-calendar web component', () => {
     el.addEventListener('input', () => seen.push('input'));
     el.addEventListener('change', () => seen.push('change'));
 
-    const button = el.shadowRoot?.querySelector?.('[data-iso-date="2026-01-10"]');
-    expect(button).not.toBeNull();
+    const input = el.shadowRoot?.querySelector?.('input[type="date"]');
+    expect(input).not.toBeNull();
 
-    button.click();
+    input.value = '2026-01-10';
+    input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
 
     expect(el.value).toBe('2026-01-10');
     expect(seen).toEqual(['input', 'change']);
