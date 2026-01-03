@@ -3,7 +3,7 @@
 /********/
 
 import { svgSize } from './config/config.js';
-import { initRenderer, drawCalendar, drawCircle, setYear, showSunAndMoonForDate } from './renderer/calendarRenderer.js';
+import { initRenderer, drawCalendar, drawCircle, setYear, showSunAndMoonForDate, writeSegmentName } from './renderer/calendarRenderer.js';
 
 function init() {
     const svg = document.getElementById("calendar-svg");
@@ -22,24 +22,18 @@ function init() {
     // Initialize renderer
     initRenderer(svg);
     
-    // Set initial year to current year
-    const currentYear = new Date().getFullYear();
-    yearInput.value = currentYear;
-    setYear(currentYear);
-    
     // Set fixed viewBox - this defines the coordinate system
     svg.setAttribute("viewBox", `0 0 ${svgSize} ${svgSize}`);
     svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
     
-    // Draw calendar with initial dimensions
+    // Draw calendar with initial dimensions (this populates labels array)
     drawCalendar();
     drawCircle();
     
-    // Show sun and moon for today's date
-    const today = new Date();
-    if (currentYear === today.getFullYear()) {
-        showSunAndMoonForDate(today);
-    }
+    // Set initial year to current year (after drawCalendar so labels are available)
+    const currentYear = new Date().getFullYear();
+    yearInput.value = currentYear;
+    setYear(currentYear);
     
     // Handle year changes
     yearInput.addEventListener("input", (e) => {

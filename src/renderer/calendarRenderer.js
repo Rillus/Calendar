@@ -49,10 +49,18 @@ export function initRenderer(svgElement) {
 // Set the year for the calendar
 export function setYear(year) {
     currentYear = year;
-    // Update sun and moon position if showing today's date
+    // Update sun and moon position
     const today = new Date();
     if (year === today.getFullYear()) {
         showSunAndMoonForDate(today);
+        // Display today's date in center text
+        writeSegmentName(labels[today.getMonth()], today);
+    } else {
+        // Show sun and moon for middle of the year if not current year
+        const midYearDate = new Date(year, 5, 15); // June 15
+        showSunAndMoonForDate(midYearDate);
+        // Display mid-year date in center text
+        writeSegmentName(labels[midYearDate.getMonth()], midYearDate);
     }
 }
 
@@ -115,31 +123,12 @@ export function drawCalendar() {
         path.setAttribute("data-hover-color", hoverColourHex);
         path.style.cursor = "pointer";
         
-        // Add event handlers
-        path.addEventListener("click", (e) => {
-            const dayInMonth = Math.floor(getDaysInMonth(i, currentYear) / 2);
-            const date = new Date(currentYear, i, dayInMonth);
-            writeSegmentName(labels[i], date);
-        });
+        // Add event handlers - just hover color change
         path.addEventListener("mouseenter", (e) => {
             e.target.setAttribute("fill", hoverColourHex);
-            const dayInMonth = Math.floor(getDaysInMonth(i, currentYear) / 2);
-            const date = new Date(currentYear, i, dayInMonth);
-            writeSegmentName(labels[i], date);
-        });
-        path.addEventListener("mousemove", (e) => {
-            handleMonthHover(e, i);
         });
         path.addEventListener("mouseleave", (e) => {
             e.target.setAttribute("fill", newColourHex);
-            drawCircle();
-            // Restore sun and moon to today's date if in current year
-            const today = new Date();
-            if (currentYear === today.getFullYear()) {
-                showSunAndMoonForDate(today);
-            } else {
-                hideSunAndMoon();
-            }
         });
         
         segmentsGroupEl.appendChild(path);
@@ -342,7 +331,7 @@ export function showSunAndMoonForDate(date) {
     const moonRadius = radius + moonDistance;
     const moonPos = polarToCartesian(centerX, centerY, moonRadius, moonAngle);
     
-    showSunAndMoon(sunPos, moonPos);
+    showSunAndMoon(sunPos, moonPos, true);
 }
 
 // Shows sun and moon based on mouse position and moon phase
@@ -428,7 +417,7 @@ function handleMonthHover(event, monthIndex) {
 }
 
 // Creates or updates sun and moon SVG elements
-function showSunAndMoon(sunPos, moonPos) {
+function showSunAndMoon(sunPos, moonPos, makeDraggable = false) {
     // Remove existing elements
     hideSunAndMoon();
     
@@ -436,6 +425,12 @@ function showSunAndMoon(sunPos, moonPos) {
     const sunGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
     sunGroup.setAttribute("class", "sun-icon");
     sunGroup.setAttribute("transform", `translate(${sunPos[0]}, ${sunPos[1]})`);
+    if (makeDraggable) {
+        sunGroup.style.cursor = "grab";
+        sunGroup.setAttribute("data-draggable", "true");
+        // Make the sun group pointer-events enabled
+        sunGroup.style.pointerEvents = "all";
+    }
     
     // Sun rays
     for (let i = 0; i < 8; i++) {
@@ -475,6 +470,11 @@ function showSunAndMoon(sunPos, moonPos) {
     
     svg.appendChild(sunGroup);
     svg.appendChild(moonCircle);
+    
+    // Add drag handlers if draggable
+    if (makeDraggable) {
+        setupSunDragHandlers(sunGroup);
+    }
 }
 
 // Removes sun and moon elements
@@ -483,5 +483,167 @@ function hideSunAndMoon() {
     const moon = svg.querySelector('.moon-icon');
     if (sun) sun.remove();
     if (moon) moon.remove();
+}
+
+// Sets up drag handlers for the sun
+function setupSunDragHandlers(sunGroup) {
+    let isDragging = false;
+    
+    const getEventPos = (e) => {
+        if (e.touches && e.touches.length > 0) {
+            return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        }
+        return { x: e.clientX, y: e.clientY };
+    };
+    
+    const getAngleFromEvent = (e) => {
+        const svgRect = svg.getBoundingClientRect();
+        const pos = getEventPos(e);
+        const mouseX = pos.x - svgRect.left;
+        const mouseY = pos.y - svgRect.top;
+        
+        // Get viewBox dimensions
+        const viewBox = svg.viewBox.baseVal;
+        const svgWidth = svgRect.width;
+        const svgHeight = svgRect.height;
+        
+        // Convert screen coordinates to SVG viewBox coordinates
+        const mouseSvgX = (mouseX / svgWidth) * viewBox.width;
+        const mouseSvgY = (mouseY / svgHeight) * viewBox.height;
+        
+        // Calculate angle from center to mouse
+        const dx = mouseSvgX - centerX;
+        const dy = mouseSvgY - centerY;
+        let angle = Math.atan2(dy, dx);
+        
+        // Normalize angle to 0-2π range
+        if (angle < 0) {
+            angle += 2 * Math.PI;
+        }
+        
+        return angle;
+    };
+    
+    const updateSunPosition = (angle) => {
+        // Calculate which month and day based on angle
+        const segmentStartAngles = [];
+        for (let i = 0; i < segments; i++) {
+            const startAngle = -degreesToRadians(sumTo(data, i)) + degreesToRadians(45);
+            let normalized = startAngle;
+            while (normalized < 0) normalized += 2 * Math.PI;
+            while (normalized >= 2 * Math.PI) normalized -= 2 * Math.PI;
+            segmentStartAngles.push({ month: i, angle: normalized });
+        }
+        
+        // Find which segment the angle falls into
+        let monthIndex = 0;
+        let angleInSegment = 0;
+        
+        for (let i = 0; i < segmentStartAngles.length; i++) {
+            const currentStart = segmentStartAngles[i].angle;
+            const nextStart = i < segmentStartAngles.length - 1 
+                ? segmentStartAngles[i + 1].angle 
+                : segmentStartAngles[0].angle + 2 * Math.PI;
+            
+            let segmentEnd = currentStart + degreesToRadians(deg);
+            if (segmentEnd > 2 * Math.PI) {
+                segmentEnd -= 2 * Math.PI;
+            }
+            
+            // Check if angle is in this segment
+            let inSegment = false;
+            if (currentStart < segmentEnd) {
+                inSegment = angle >= currentStart && angle < segmentEnd;
+            } else {
+                // Segment wraps around
+                inSegment = angle >= currentStart || angle < segmentEnd;
+            }
+            
+            if (inSegment) {
+                monthIndex = segmentStartAngles[i].month;
+                angleInSegment = angle - currentStart;
+                if (angleInSegment < 0) {
+                    angleInSegment += 2 * Math.PI;
+                }
+                break;
+            }
+        }
+        
+        // Calculate day within the month
+        const segmentSize = degreesToRadians(deg);
+        angleInSegment = Math.max(0, Math.min(angleInSegment, segmentSize));
+        const positionInSegment = 1 - (angleInSegment / segmentSize); // Reverse for clockwise
+        const daysInMonth = getDaysInMonth(monthIndex, currentYear);
+        const dayInMonth = Math.max(1, Math.min(daysInMonth, Math.floor(positionInSegment * daysInMonth) + 1));
+        
+        // Create date and update display
+        const date = new Date(currentYear, monthIndex, dayInMonth);
+        writeSegmentName(labels[monthIndex], date);
+        
+        // Update sun and moon positions
+        const sunRadius = radius + sunDistance;
+        const sunPos = polarToCartesian(centerX, centerY, sunRadius, angle);
+        
+        const moonPhaseAngle = getMoonPhaseAngle(date);
+        const moonAngle = angle - moonPhaseAngle;
+        const moonRadius = radius + moonDistance;
+        const moonPos = polarToCartesian(centerX, centerY, moonRadius, moonAngle);
+        
+        // Update sun position
+        sunGroup.setAttribute("transform", `translate(${sunPos[0]}, ${sunPos[1]})`);
+        
+        // Update moon position
+        const moonCircle = svg.querySelector('.moon-icon');
+        if (moonCircle) {
+            moonCircle.setAttribute("cx", moonPos[0]);
+            moonCircle.setAttribute("cy", moonPos[1]);
+        }
+    };
+    
+    // Mouse events
+    sunGroup.addEventListener("mousedown", (e) => {
+        isDragging = true;
+        sunGroup.style.cursor = "grabbing";
+        e.preventDefault();
+        e.stopPropagation();
+    });
+    
+    const handleMouseMove = (e) => {
+        if (isDragging) {
+            const angle = getAngleFromEvent(e);
+            updateSunPosition(angle);
+            e.preventDefault();
+        }
+    };
+    
+    const handleMouseUp = () => {
+        if (isDragging) {
+            isDragging = false;
+            sunGroup.style.cursor = "grab";
+        }
+    };
+    
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+    
+    // Touch events - use passive listeners where possible
+    sunGroup.addEventListener("touchstart", (e) => {
+        isDragging = true;
+        e.preventDefault();
+    }, { passive: false });
+    
+    document.addEventListener("touchmove", (e) => {
+        if (isDragging) {
+            const angle = getAngleFromEvent(e);
+            updateSunPosition(angle);
+            e.preventDefault();
+        }
+    }, { passive: false });
+    
+    document.addEventListener("touchend", () => {
+        if (isDragging) {
+            isDragging = false;
+        }
+    }, { passive: true });
 }
 

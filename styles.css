@@ -102,9 +102,13 @@ body {
   }
   
   .sun-icon {
-    pointer-events: none;
     opacity: 0.9;
     filter: drop-shadow(0 0 3px rgba(255, 215, 0, 0.5));
+    cursor: grab;
+    
+    &:active {
+      cursor: grabbing;
+    }
   }
   
   .moon-icon {
