@@ -5,21 +5,37 @@
 export const calendarType = "year";
 export const segments = 12;
 
-// Custom seasonal color palette matching the image
+// Custom seasonal color palette
 // Each month gets its own color in the seasonal gradient
 export const monthColors = [
-    [120, 80, 160],   // JAN - Deep purple/blue
-    [100, 120, 200],  // FEB - Medium blue
-    [80, 180, 220],   // MAR - Light blue/teal
-    [60, 200, 200],   // APR - Greenish-blue
-    [100, 220, 140],  // MAY - Light green
-    [160, 240, 100],  // JUN - Yellow-green
-    [255, 242, 0],    // JUL - Bright yellow
-    [255, 200, 0],    // AUG - Golden yellow
-    [255, 140, 60],   // SEP - Orange
-    [255, 100, 80],   // OCT - Red-orange
-    [220, 80, 120],   // NOV - Darker red-orange/magenta
-    [180, 100, 160]   // DEC - Purple/magenta
+    [72, 88, 154],    // JAN - #48589a
+    [39, 93, 164],    // FEB - #275da4
+    [61, 138, 174],   // MAR - #3d8aae
+    [101, 154, 139],  // APR - #659a8b
+    [155, 177, 70],   // MAY - #9bb146
+    [182, 199, 65],   // JUN - #b6c741
+    [218, 205, 72],   // JUL - #dacd48
+    [236, 211, 68],   // AUG - #ecd344
+    [251, 184, 65],   // SEP - #fbb841
+    [248, 132, 40],   // OCT - #f88428
+    [229, 94, 52],    // NOV - #e55e34
+    [153, 32, 122]    // DEC - #99207a
+];
+
+// Light version of palette for hover states
+export const monthColorsHover = [
+    [117, 132, 196],  // JAN - #7584c4 (light)
+    [91, 154, 238],   // FEB - #5b9aee (light)
+    [109, 183, 217], // MAR - #6db7d9 (light)
+    [123, 182, 165],  // APR - #7bb6a5 (light)
+    [170, 193, 80],  // MAY - #aac150 (light)
+    [182, 199, 65],  // JUN - #b6c741 (light - same as dark)
+    [218, 205, 72],  // JUL - #dacd48 (light - same as dark)
+    [236, 211, 68],  // AUG - #ecd344 (light - same as dark)
+    [251, 184, 65],  // SEP - #fbb841 (light - same as dark)
+    [252, 153, 75],  // OCT - #fc994b (light)
+    [255, 158, 128], // NOV - #ff9e80 (light)
+    [226, 115, 198]  // DEC - #e273c6 (light)
 ];
 
 export const months = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
@@ -29,7 +45,8 @@ export const deg = 360 / segments;
 
 // Notch configuration: shorter months have reduced outer radius
 export const fullRadius = 1.0;  // 31-day months
-export const notchedRadius = 0.92; // 30-day months and February
+export const notchedRadius30 = 0.96; // 30-day months (less pronounced)
+export const notchedRadiusFeb = 0.92; // February (more pronounced)
 
 // SVG dimensions
 export const svgSize = 400;

@@ -1,0 +1,331 @@
+/* Modern CSS Reset and Base Styles */
+
+/* Box sizing */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Reset margins and padding */
+* {
+  margin: 0;
+  padding: 0;
+}
+
+/* Base HTML */
+html {
+  font-size: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Body */
+body {
+  margin: 0;
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: #f5f5f5;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.5;
+  color: #333;
+}
+
+/* Calendar Container */
+#calendar-container {
+  width: min(100%, 600px);
+  aspect-ratio: 1;
+  margin: 0 auto;
+}
+
+/* SVG Calendar */
+#calendar-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* SVG Elements */
+#calendar-svg {
+  .calendar-segment {
+    transition: opacity 0.2s ease;
+    
+    &:hover {
+      opacity: 0.9;
+    }
+  }
+  
+  .segment-label {
+    user-select: none;
+    pointer-events: none;
+  }
+  
+  .center-circle {
+    pointer-events: none;
+  }
+  
+  .center-text {
+    pointer-events: none;
+    font-weight: 500;
+  }
+}
+
+/* Month Colour Classes */
+.Jan-bg {
+  background-color: #48589a;
+}
+
+.Jan-text {
+  color: #48589a;
+}
+
+.Jan-bg-light {
+  background-color: #7584c4;
+}
+
+.Jan-text-light {
+  color: #7584c4;
+}
+
+.Feb-bg {
+  background-color: #275da4;
+}
+
+.Feb-text {
+  color: #275da4;
+}
+
+.Feb-bg-light {
+  background-color: #5b9aee;
+}
+
+.Feb-text-light {
+  color: #5b9aee;
+}
+
+.Mar-bg {
+  background-color: #3d8aae;
+}
+
+.Mar-text {
+  color: #3d8aae;
+}
+
+.Mar-bg-light {
+  background-color: #6db7d9;
+}
+
+.Mar-text-light {
+  color: #6db7d9;
+}
+
+.Apr-bg {
+  background-color: #659a8b;
+}
+
+.Apr-text {
+  color: #659a8b;
+}
+
+.Apr-bg-light {
+  background-color: #7bb6a5;
+}
+
+.Apr-text-light {
+  color: #7bb6a5;
+}
+
+.May-bg {
+  background-color: #9bb146;
+}
+
+.May-text {
+  color: #9bb146;
+}
+
+.Jun-bg {
+  background-color: #b6c741;
+}
+
+.Jun-text {
+  color: #b6c741;
+}
+
+.Jul-bg {
+  background-color: #dacd48;
+}
+
+.Jul-text {
+  color: #dacd48;
+}
+
+.Aug-bg {
+  background-color: #ecd344;
+}
+
+.Aug-text {
+  color: #ecd344;
+}
+
+.Sep-bg {
+  background-color: #fbb841;
+}
+
+.Sep-text {
+  color: #fbb841;
+}
+
+.Oct-bg {
+  background-color: #f88428;
+}
+
+.Oct-text {
+  color: #f88428;
+}
+
+.Nov-bg {
+  background-color: #e55e34;
+}
+
+.Nov-text {
+  color: #e55e34;
+}
+
+.Dec-bg {
+  background-color: #99207a;
+}
+
+.Dec-text {
+  color: #99207a;
+}
+
+.Oct-bg-light {
+  background-color: #fc994b;
+}
+
+.Oct-text-light {
+  color: #fc994b;
+}
+
+.Nov-bg-light {
+  background-color: #ff9e80;
+}
+
+.Nov-text-light {
+  color: #ff9e80;
+}
+
+.Dec-bg-light {
+  background-color: #e273c6;
+}
+
+.Dec-text-light {
+  color: #e273c6;
+}
+
+/* Month background padding */
+.Jan-bg,
+.Feb-bg,
+.Mar-bg,
+.Apr-bg,
+.Jan-bg-light,
+.Feb-bg-light,
+.Mar-bg-light,
+.Apr-bg-light,
+.May-bg,
+.Jun-bg,
+.Jul-bg,
+.Aug-bg,
+.Sep-bg,
+.Oct-bg,
+.Nov-bg,
+.Dec-bg,
+.Oct-bg-light,
+.Nov-bg-light,
+.Dec-bg-light {
+  padding: 5px;
+}
+
+/* Dark text on light backgrounds */
+.Apr-bg,
+.May-bg,
+.Jun-bg,
+.Jul-bg,
+.Aug-bg,
+.Sep-bg,
+.Oct-bg,
+.Jan-bg-light,
+.Feb-bg-light,
+.Mar-bg-light,
+.Apr-bg-light,
+.Oct-bg-light,
+.Nov-bg-light,
+.Dec-bg-light {
+  color: #000;
+}
+
+/* Text shadow for dark backgrounds */
+.Nov-text,
+.Dec-text,
+.Jan-text,
+.Feb-text,
+.Mar-text {
+  text-shadow: 0px 0px 5px rgba(255, 255, 255, 0.2);
+}
+
+/* Highlighter colours */
+.Highlight {
+  position: relative;
+  display: inline-block;
+}
+
+.Highlight::before {
+  background-color: #fdff00;
+  content: "";
+  position: absolute;
+  width: calc(100% + 4px);
+  height: 60%;
+  left: -2px;
+  bottom: 0;
+  z-index: -1;
+  transform: rotate(-2deg);
+}
+
+.Highlight--yellow::before {
+  background-color: #fdff00;
+}
+
+.Highlight--orange::before {
+  background-color: #ff9a00;
+}
+
+.Highlight--green::before {
+  background-color: #00ff04;
+}
+
+.Highlight--blue::before {
+  background-color: #00c5ff;
+}
+
+.Highlight--pink::before {
+  background-color: #ff00a7;
+}
+
+.theme-dark .Highlight::before {
+  opacity: 0.4;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  body {
+    padding: 10px;
+  }
+  
+  #calendar-container {
+    width: 100%;
+  }
+}
+

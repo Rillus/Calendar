@@ -5,11 +5,13 @@
 import { 
     segments, 
     monthColors, 
+    monthColorsHover,
     months, 
     monthDays, 
     deg, 
     fullRadius, 
-    notchedRadius,
+    notchedRadius30,
+    notchedRadiusFeb,
     svgSize 
 } from './config.js';
 import { rgbToHex } from './colorUtils.js';
@@ -54,7 +56,9 @@ export function drawCalendar() {
     for (let i = 0; i < segments; i++) {
         // Use custom color for each month
         const monthColor = monthColors[i];
+        const monthColorHover = monthColorsHover[i];
         const newColourHex = rgbToHex(monthColor);
+        const hoverColourHex = rgbToHex(monthColorHover);
         
         data.push(deg);
         colours.push(newColourHex);
@@ -62,7 +66,16 @@ export function drawCalendar() {
         
         // Determine outer radius based on month length (notched for shorter months)
         const days = monthDays[i];
-        const outerRadiusRatio = (days === 31) ? fullRadius : notchedRadius;
+        let outerRadiusRatio;
+        if (days === 31) {
+            outerRadiusRatio = fullRadius;
+        } else if (days === 28) {
+            // February - more pronounced notch
+            outerRadiusRatio = notchedRadiusFeb;
+        } else {
+            // 30-day months - less pronounced notch
+            outerRadiusRatio = notchedRadius30;
+        }
         
         // Create segment path
         const startingAngle = -degreesToRadians(sumTo(data, i)) + degreesToRadians(45);
@@ -76,12 +89,20 @@ export function drawCalendar() {
         path.setAttribute("stroke-width", "1");
         path.setAttribute("data-segment-index", i);
         path.setAttribute("class", "calendar-segment");
+        path.setAttribute("data-base-color", newColourHex);
+        path.setAttribute("data-hover-color", hoverColourHex);
         path.style.cursor = "pointer";
         
         // Add event handlers
         path.addEventListener("click", () => writeSegmentName(labels[i]));
-        path.addEventListener("mouseenter", () => writeSegmentName(labels[i]));
-        path.addEventListener("mouseleave", () => drawCircle());
+        path.addEventListener("mouseenter", (e) => {
+            e.target.setAttribute("fill", hoverColourHex);
+            writeSegmentName(labels[i]);
+        });
+        path.addEventListener("mouseleave", (e) => {
+            e.target.setAttribute("fill", newColourHex);
+            drawCircle();
+        });
         
         segmentsGroupEl.appendChild(path);
         
@@ -109,8 +130,19 @@ export function drawCalendar() {
         text.style.fontSize = `${svgSize / 35}px`;
         text.style.fontFamily = "Helvetica, Arial, sans-serif";
         text.style.fontWeight = "bold";
-        text.style.fill = "#333";
         text.style.pointerEvents = "none";
+        
+        // Apply contrast rules based on CSS: dark text on light backgrounds, text shadow on dark backgrounds
+        // Dark text (#000) for: Apr (3), May (4), Jun (5), Jul (6), Aug (7), Sep (8), Oct (9)
+        // Text shadow for: Jan (0), Feb (1), Mar (2), Nov (10), Dec (11)
+        if (i >= 3 && i <= 9) {
+            // Light backgrounds - use dark text
+            text.style.fill = "#000";
+        } else {
+            // Dark backgrounds - use light text with shadow
+            text.style.fill = "#fff";
+            text.style.filter = "drop-shadow(0px 0px 5px rgba(255, 255, 255, 0.2))";
+        }
         
         segmentsGroupEl.appendChild(text);
     }
