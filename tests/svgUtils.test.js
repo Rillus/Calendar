@@ -129,13 +129,14 @@ describe('svgUtils', () => {
     });
 
     it('should flip the terminator sweep between crescent and gibbous (waxing)', () => {
-      // Waxing crescent: terminator should bulge opposite the lit side.
+      // Waxing crescent: terminator should be on the same side as the lit limb (thin sliver).
       const crescent = createMoonIlluminatedPath(0, 0, 10, 0.1);
-      // Waxing gibbous: terminator should bulge with the lit side.
+      // Waxing gibbous: terminator should be on the opposite side (most of the disc lit).
       const gibbous = createMoonIlluminatedPath(0, 0, 10, 0.4);
       expect(typeof crescent).toBe('string');
       expect(typeof gibbous).toBe('string');
       // Terminator is the second arc. Extract "... A <rx> 10 0 <largeArc> <sweep> ..."
+      // Waxing uses limb sweep=1 (right side).
       expect(crescent).toMatch(/A [^ ]+ 10 0 [01] 1 0 -10/);
       expect(gibbous).toMatch(/A [^ ]+ 10 0 [01] 0 0 -10/);
     });
@@ -145,6 +146,7 @@ describe('svgUtils', () => {
       const crescent = createMoonIlluminatedPath(0, 0, 10, 0.9);
       expect(typeof crescent).toBe('string');
       expect(typeof gibbous).toBe('string');
+      // Waning uses limb sweep=0 (left side).
       expect(crescent).toMatch(/A [^ ]+ 10 0 [01] 0 0 -10/);
       expect(gibbous).toMatch(/A [^ ]+ 10 0 [01] 1 0 -10/);
     });

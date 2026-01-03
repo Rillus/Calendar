@@ -100,16 +100,15 @@ export function createMoonIlluminatedPath(centerX, centerY, radius, phase) {
     const isWaxing = p < 0.5;
     const limbSweep = isWaxing ? 1 : 0;
 
-    // Crescents and gibbous phases need opposite terminator curvature:
-    // - crescents: terminator bulges away from the lit side (to form a thin sliver)
-    // - gibbous: terminator bulges with the lit side (shadow is the smaller portion)
+    // Choose which side of the terminator ellipse to trace:
+    // - crescents (< 0.5 illuminated): terminator must be on the SAME side as the lit limb,
+    //   otherwise you get a thick shape instead of a thin sliver.
+    // - gibbous (> 0.5 illuminated): terminator is on the OPPOSITE side, so most of the disc is lit.
     const isGibbous = illuminatedFraction > 0.5;
-    const terminatorSweep = isWaxing
-        ? (isGibbous ? 0 : 1) // waxing gibbous bulges right, waxing crescent bulges left
-        : (isGibbous ? 1 : 0); // waning gibbous bulges left, waning crescent bulges right
+    const terminatorSweep = isGibbous ? (limbSweep ? 0 : 1) : limbSweep;
 
-    // Gibbous phases use the longer ellipse arc for the terminator.
-    const largeArcFlag = isGibbous ? 1 : 0;
+    // With top/bottom endpoints, largeArcFlag has no visible effect, but keep it explicit.
+    const largeArcFlag = 0;
 
     return [
         'M', cx, topY,
