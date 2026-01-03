@@ -19,7 +19,7 @@ import {
 } from '../config/config.js';
 import { rgbToHex } from '../utils/colorUtils.js';
 import { degreesToRadians, sumTo, polarToCartesian } from '../utils/mathUtils.js';
-import { createArcPath, createMoonIlluminatedPath } from '../utils/svgUtils.js';
+import { createArcPath, getMoonShadowDx } from '../utils/svgUtils.js';
 import { getDaysInMonth } from '../utils/dateUtils.js';
 import { getMoonPhase, getMoonPhaseAngle, getMoonPhaseName } from '../utils/moonPhase.js';
 
@@ -55,6 +55,7 @@ let centerX = svgSize / 2;
 let centerY = svgSize / 2;
 let radius = svgSize / 2;
 let currentYear = new Date().getFullYear();
+let moonClipIdCounter = 0;
 
 // Initialize renderer with SVG element
 export function initRenderer(svgElement) {
@@ -493,32 +494,54 @@ function showSunAndMoon(sunPos, moonPos, makeDraggable = false, moonPhase = null
     sunCircle.setAttribute("stroke-width", "1");
     sunGroup.appendChild(sunCircle);
     
-    // Create moon icon (dark disc with illuminated overlay)
+    // Create moon icon (white disc with clipped black shadow circle)
     const moonGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
     moonGroup.setAttribute("class", "moon-icon");
     moonGroup.setAttribute("transform", `translate(${moonPos[0]}, ${moonPos[1]})`);
 
     const moonRadius = 6;
 
-    const moonBase = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    moonBase.setAttribute("cx", "0");
-    moonBase.setAttribute("cy", "0");
-    moonBase.setAttribute("r", String(moonRadius));
-    moonBase.setAttribute("fill", "#111");
-    moonBase.setAttribute("stroke", "#999");
-    moonBase.setAttribute("stroke-width", "1");
-    moonBase.setAttribute("class", "moon-icon__base");
-    moonGroup.appendChild(moonBase);
+    const clipId = `moon-clip-${moonClipIdCounter++}`;
+    const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+    const clipPath = document.createElementNS("http://www.w3.org/2000/svg", "clipPath");
+    clipPath.setAttribute("id", clipId);
+    const clipCircle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    clipCircle.setAttribute("cx", "0");
+    clipCircle.setAttribute("cy", "0");
+    clipCircle.setAttribute("r", String(moonRadius));
+    clipPath.appendChild(clipCircle);
+    defs.appendChild(clipPath);
+    moonGroup.appendChild(defs);
+
+    const moonDisc = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    moonDisc.setAttribute("cx", "0");
+    moonDisc.setAttribute("cy", "0");
+    moonDisc.setAttribute("r", String(moonRadius));
+    moonDisc.setAttribute("fill", "#f5f5f5");
+    moonDisc.setAttribute("class", "moon-icon__disc");
+    moonGroup.appendChild(moonDisc);
 
     const phaseValue = Number.isFinite(Number(moonPhase)) ? Number(moonPhase) : 0;
-    const illuminatedPath = createMoonIlluminatedPath(0, 0, moonRadius, phaseValue);
-    if (illuminatedPath) {
-        const lit = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        lit.setAttribute("d", illuminatedPath);
-        lit.setAttribute("fill", "#f5f5f5");
-        lit.setAttribute("class", "moon-icon__lit");
-        moonGroup.appendChild(lit);
-    }
+    const shadowDx = getMoonShadowDx(moonRadius, phaseValue);
+
+    const moonShadow = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    moonShadow.setAttribute("cx", String(shadowDx));
+    moonShadow.setAttribute("cy", "0");
+    moonShadow.setAttribute("r", String(moonRadius));
+    moonShadow.setAttribute("fill", "#111");
+    moonShadow.setAttribute("clip-path", `url(#${clipId})`);
+    moonShadow.setAttribute("class", "moon-icon__shadow");
+    moonGroup.appendChild(moonShadow);
+
+    const moonOutline = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    moonOutline.setAttribute("cx", "0");
+    moonOutline.setAttribute("cy", "0");
+    moonOutline.setAttribute("r", String(moonRadius));
+    moonOutline.setAttribute("fill", "none");
+    moonOutline.setAttribute("stroke", "#999");
+    moonOutline.setAttribute("stroke-width", "1");
+    moonOutline.setAttribute("class", "moon-icon__outline");
+    moonGroup.appendChild(moonOutline);
     
     svg.appendChild(sunGroup);
     svg.appendChild(moonGroup);
@@ -652,19 +675,10 @@ function setupSunDragHandlers(sunGroup) {
             moonGroup.setAttribute("transform", `translate(${moonPos[0]}, ${moonPos[1]})`);
 
             const moonIconRadius = 6;
-            const illuminatedPath = createMoonIlluminatedPath(0, 0, moonIconRadius, moonPhase);
-            const existingLit = moonGroup.querySelector?.('.moon-icon__lit');
-
-            if (!illuminatedPath) {
-                if (existingLit) existingLit.remove();
-            } else if (existingLit) {
-                existingLit.setAttribute('d', illuminatedPath);
-            } else {
-                const lit = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                lit.setAttribute("d", illuminatedPath);
-                lit.setAttribute("fill", "#f5f5f5");
-                lit.setAttribute("class", "moon-icon__lit");
-                moonGroup.appendChild(lit);
+            const shadowDx = getMoonShadowDx(moonIconRadius, moonPhase);
+            const shadow = moonGroup.querySelector?.('.moon-icon__shadow');
+            if (shadow) {
+                shadow.setAttribute('cx', String(shadowDx));
             }
         }
     };

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createArcPath, createMoonIlluminatedPath } from '../src/utils/svgUtils.js';
+import { createArcPath, getMoonIlluminatedFraction, getMoonShadowDx } from '../src/utils/svgUtils.js';
 
 describe('svgUtils', () => {
   describe('createArcPath', () => {
@@ -89,66 +89,39 @@ describe('svgUtils', () => {
     });
   });
 
-  describe('createMoonIlluminatedPath', () => {
-    it('should return null for new moon (phase 0)', () => {
-      const d = createMoonIlluminatedPath(0, 0, 10, 0);
-      expect(d).toBe(null);
+  describe('moon illumination helpers', () => {
+    it('should report 0 illumination for new moon (phase 0)', () => {
+      expect(getMoonIlluminatedFraction(0)).toBeCloseTo(0, 8);
     });
 
-    it('should return null for new moon again (phase 1)', () => {
-      const d = createMoonIlluminatedPath(0, 0, 10, 1);
-      expect(d).toBe(null);
+    it('should report 1 illumination for full moon (phase 0.5)', () => {
+      expect(getMoonIlluminatedFraction(0.5)).toBeCloseTo(1, 8);
     });
 
-    it('should return a non-empty path for first quarter (phase 0.25)', () => {
-      const d = createMoonIlluminatedPath(0, 0, 10, 0.25);
-      expect(typeof d).toBe('string');
-      expect(d.length).toBeGreaterThan(0);
-      // Quarter moon terminator should be a straight line (rx ~= 0)
-      expect(d).toContain('A 0 10');
+    it('should report ~0.5 illumination for quarters (0.25 and 0.75)', () => {
+      expect(getMoonIlluminatedFraction(0.25)).toBeCloseTo(0.5, 8);
+      expect(getMoonIlluminatedFraction(0.75)).toBeCloseTo(0.5, 8);
     });
 
-    it('should return a non-empty path for last quarter (phase 0.75)', () => {
-      const d = createMoonIlluminatedPath(0, 0, 10, 0.75);
-      expect(typeof d).toBe('string');
-      expect(d.length).toBeGreaterThan(0);
-      expect(d).toContain('A 0 10');
+    it('should return dx=0 for new moon (shadow fully covers)', () => {
+      expect(getMoonShadowDx(10, 0)).toBeCloseTo(0, 8);
+      expect(getMoonShadowDx(10, 1)).toBeCloseTo(0, 8);
     });
 
-    it('should return a circle-like path for full moon (phase 0.5)', () => {
-      const d = createMoonIlluminatedPath(0, 0, 10, 0.5);
-      expect(typeof d).toBe('string');
-      expect(d).toContain('A 10 10');
-      expect(d.trim().endsWith('Z')).toBe(true);
+    it('should return |dx| ~= 2r for full moon (shadow moved off)', () => {
+      expect(Math.abs(getMoonShadowDx(10, 0.5))).toBeCloseTo(20, 8);
     });
 
-    it('should treat negative phases as wrapping around', () => {
-      const d1 = createMoonIlluminatedPath(0, 0, 10, -0.5);
-      const d2 = createMoonIlluminatedPath(0, 0, 10, 0.5);
-      expect(d1).toBe(d2);
+    it('should shift shadow left for waxing (positive light on right)', () => {
+      expect(getMoonShadowDx(10, 0.25)).toBeLessThan(0);
     });
 
-    it('should flip the terminator sweep between crescent and gibbous (waxing)', () => {
-      // Waxing crescent: terminator should be on the same side as the lit limb (thin sliver).
-      const crescent = createMoonIlluminatedPath(0, 0, 10, 0.1);
-      // Waxing gibbous: terminator should be on the opposite side (most of the disc lit).
-      const gibbous = createMoonIlluminatedPath(0, 0, 10, 0.4);
-      expect(typeof crescent).toBe('string');
-      expect(typeof gibbous).toBe('string');
-      // Terminator is the second arc. Extract "... A <rx> 10 0 <largeArc> <sweep> ..."
-      // Waxing uses limb sweep=1 (right side).
-      expect(crescent).toMatch(/A [^ ]+ 10 0 [01] 1 0 -10/);
-      expect(gibbous).toMatch(/A [^ ]+ 10 0 [01] 0 0 -10/);
+    it('should shift shadow right for waning (positive light on left)', () => {
+      expect(getMoonShadowDx(10, 0.75)).toBeGreaterThan(0);
     });
 
-    it('should flip the terminator sweep between crescent and gibbous (waning)', () => {
-      const gibbous = createMoonIlluminatedPath(0, 0, 10, 0.6);
-      const crescent = createMoonIlluminatedPath(0, 0, 10, 0.9);
-      expect(typeof crescent).toBe('string');
-      expect(typeof gibbous).toBe('string');
-      // Waning uses limb sweep=0 (left side).
-      expect(crescent).toMatch(/A [^ ]+ 10 0 [01] 0 0 -10/);
-      expect(gibbous).toMatch(/A [^ ]+ 10 0 [01] 1 0 -10/);
+    it('should wrap negative phases', () => {
+      expect(getMoonShadowDx(10, -0.25)).toBeCloseTo(getMoonShadowDx(10, 0.75), 8);
     });
   });
 });

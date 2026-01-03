@@ -40,6 +40,36 @@ const normalisePhase = (phase) => {
     return wrapped;
 };
 
+export function getMoonIlluminatedFraction(phase) {
+    const p = normalisePhase(phase);
+    const angle = p * 2 * Math.PI;
+    // 0 (new) -> 1 (full) -> 0 (new)
+    return (1 - Math.cos(angle)) / 2;
+}
+
+/**
+ * Returns the horizontal offset (dx) for a shadow circle used to shade the moon.
+ *
+ * Used with a white base disc + a clipped black shadow circle of equal radius:
+ * - new moon: dx ~= 0 (shadow covers disc)
+ * - full moon: |dx| ~= 2r (shadow moved off disc)
+ * - waxing phases: shadow moves left (negative dx), leaving light on the right
+ * - waning phases: shadow moves right (positive dx), leaving light on the left
+ */
+export function getMoonShadowDx(radius, phase) {
+    const rValue = Number(radius);
+    if (!Number.isFinite(rValue) || rValue <= 0) return 0;
+
+    const p = normalisePhase(phase);
+    const illuminatedFraction = getMoonIlluminatedFraction(p);
+
+    const magnitude = 2 * rValue * illuminatedFraction;
+    const isWaxing = p < 0.5;
+    const direction = isWaxing ? -1 : 1;
+    // At exact new moon magnitude is 0, so direction doesn't matter.
+    return direction * magnitude;
+}
+
 const formatNumber = (value) => {
     // Keep path strings stable for tests and diffs.
     if (Math.abs(value) < 1e-10) return '0';
