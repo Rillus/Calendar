@@ -7,12 +7,13 @@ This is a circular calendar visualisation built with vanilla JavaScript and SVG.
 ## Architecture Principles
 
 1. **Modular Structure**: Code is split into focused modules:
-   - `config.js` - Constants and configuration only
-   - `colorUtils.js` - Colour conversion utilities
-   - `mathUtils.js` - Mathematical helper functions
-   - `svgUtils.js` - SVG path creation
-   - `calendarRenderer.js` - Rendering logic
-   - `cal.js` - Initialisation and orchestration
+   - `src/config/config.js` - Constants and configuration only
+   - `src/utils/colorUtils.js` - Colour conversion utilities
+   - `src/utils/mathUtils.js` - Mathematical helper functions
+   - `src/utils/svgUtils.js` - SVG path creation
+   - `src/renderer/calendarRenderer.js` - Rendering logic
+   - `src/main.js` - Initialisation and orchestration
+   - `tests/` - All test files
 
 2. **Single Responsibility**: Each module should have one clear purpose
 
@@ -42,34 +43,73 @@ This is a circular calendar visualisation built with vanilla JavaScript and SVG.
 - Use `viewBox` for responsiveness
 - Keep paths and transformations efficient
 
-## Testing Considerations
+## Testing Strategy
 
-- Code must work with a local web server (ES6 modules requirement)
-- Test in modern browsers (Chrome, Firefox, Safari, Edge)
-- Ensure responsive design works at different viewport sizes
+**TDD (Test-Driven Development) is required for this project.**
+
+1. **Write tests first**: Before implementing any feature or fixing a bug, write the test(s) first
+2. **Red-Green-Refactor cycle**: 
+   - Red: Write a failing test
+   - Green: Write the minimum code to make it pass
+   - Refactor: Improve the code while keeping tests green
+3. **Test coverage**: Aim for high coverage of utility functions and core logic
+4. **Unit tests**: Use Vitest for unit testing utility functions (mathUtils, colorUtils, svgUtils)
+5. **Integration tests**: Test calendar rendering and interactions where possible
+
+### Testing Tools
+
+- **Vitest**: Primary testing framework for unit tests
+- **ES6 Modules**: Tests use the same module system as the codebase
+- **Browser Testing**: Manual testing in modern browsers (Chrome, Firefox, Safari, Edge)
+- **Responsive Testing**: Ensure responsive design works at different viewport sizes
+
+### Test File Organisation
+
+- Test files are located in the `tests/` directory
+- Naming convention: `*.test.js` or `*.spec.js`
+- Example: `tests/mathUtils.test.js` tests `src/utils/mathUtils.js`
+- Import paths should use relative paths from test files to source files
 
 ## When Adding Features
+
+**Always follow TDD workflow:**
+
+1. **Write tests first**: Create test file(s) with failing tests for the new feature
+2. **Implement feature**: Write minimum code to pass tests
+3. **Refactor**: Improve code while keeping tests green
+4. **Update tests**: Add edge cases and integration tests as needed
+
+### Feature Planning
 
 1. **Zoom Levels**: Plan for year → month → week → day navigation
 2. **D3.js Integration**: When adding D3.js, maintain the existing SVG structure
 3. **Date Information**: Consider how to display dates at different zoom levels
 4. **Performance**: Keep rendering efficient, especially with many segments
 
+### Testing New Features
+
+- Unit test utility functions (math, colour, SVG operations)
+- Test edge cases and error handling
+- Integration tests for rendering logic where feasible
+- Manual browser testing for visual/interactive features
+
 ## Common Patterns
 
-- Calendar state (data, labels, colours) lives in `calendarRenderer.js`
-- Mathematical calculations go in `mathUtils.js`
-- Colour operations go in `colorUtils.js`
-- SVG path generation goes in `svgUtils.js`
-- Configuration changes go in `config.js`
+- Calendar state (data, labels, colours) lives in `src/renderer/calendarRenderer.js`
+- Mathematical calculations go in `src/utils/mathUtils.js`
+- Colour operations go in `src/utils/colorUtils.js`
+- SVG path generation goes in `src/utils/svgUtils.js`
+- Configuration changes go in `src/config/config.js`
 
 ## Avoid
 
+- **Writing code without tests first** (TDD violation)
 - Bundling code unless explicitly requested
-- Adding unnecessary dependencies
+- Adding unnecessary dependencies (except testing tools)
 - Mixing concerns (e.g., math in renderer, rendering in utils)
 - Breaking the modular structure
 - Using Canvas instead of SVG
+- Skipping tests for utility functions
 
 ## Future Considerations
 

@@ -20,7 +20,7 @@ A modern SVG-based circular calendar visualisation with seasonal colour gradient
 ### Installation
 
 1. Clone or download this repository
-2. Install dependencies (optional - only needed for dev server):
+2. Install dependencies:
    ```bash
    npm install
    ```
@@ -60,16 +60,23 @@ Then open `http://localhost:8000` in your browser.
 ```
 Calendar/
 ├── index.html              # Main HTML file
-├── cal.js                  # Main entry point (initialisation)
-├── config.js               # Constants and configuration
-├── colorUtils.js           # Colour conversion utilities
-├── mathUtils.js             # Mathematical helper functions
-├── svgUtils.js              # SVG path creation utilities
-├── calendarRenderer.js      # Calendar drawing and rendering logic
-├── bootstrap.css            # Styles (legacy Bootstrap)
-├── package.json             # npm configuration
-├── README.md                # This file
-└── .cursorrules             # Cursor AI instructions for the project
+├── styles.css              # Styles
+├── src/                    # Source code
+│   ├── main.js             # Main entry point (initialisation)
+│   ├── config/             # Configuration
+│   │   └── config.js       # Constants and configuration
+│   ├── utils/              # Utility modules
+│   │   ├── colorUtils.js   # Colour conversion utilities
+│   │   ├── mathUtils.js    # Mathematical helper functions
+│   │   └── svgUtils.js     # SVG path creation utilities
+│   └── renderer/           # Rendering logic
+│       └── calendarRenderer.js  # Calendar drawing and rendering
+├── tests/                  # Test files
+│   ├── *.test.js           # Unit tests for each module
+├── package.json            # npm configuration
+├── vitest.config.js        # Vitest configuration
+├── README.md               # This file
+└── .cursorrules            # Cursor AI instructions
 ```
 
 **Note**: `cal-bundled.js` exists as a legacy single-file version but is not used. The project uses ES6 modules.
@@ -87,14 +94,45 @@ The codebase is split into logical modules:
 
 ## Development
 
+### Test-Driven Development (TDD)
+
+This project uses **TDD (Test-Driven Development)** as the primary development methodology:
+
+1. **Write tests first**: Before implementing any feature, write the test(s) that define the expected behaviour
+2. **Red-Green-Refactor cycle**:
+   - **Red**: Write a failing test
+   - **Green**: Write the minimum code to make it pass
+   - **Refactor**: Improve the code while keeping tests green
+3. **Run tests**: Use `npm test` to run the test suite
+
+### Running Tests
+
+```bash
+# Run tests once
+npm test
+
+# Run tests in watch mode (recommended during development)
+npm run test:watch
+
+# Run tests with coverage report
+npm run test:coverage
+```
+
 ### Adding Features
 
 When adding new features:
 
-1. Keep modules focused on single responsibilities
-2. Use ES6 modules (import/export)
-3. Follow the existing code style (British English, descriptive names)
-4. Update this README if adding new dependencies or setup steps
+1. **Write tests first** (TDD requirement)
+2. Keep modules focused on single responsibilities
+3. Use ES6 modules (import/export)
+4. Follow the existing code style (British English, descriptive names)
+5. Update this README if adding new dependencies or setup steps
+
+### Test File Organisation
+
+- Test files use `.test.js` or `.spec.js` naming
+- Tests are co-located with source files or in `__tests__` directories
+- Example: `mathUtils.test.js` tests `mathUtils.js`
 
 ### Code Style
 
