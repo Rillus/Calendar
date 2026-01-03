@@ -7,16 +7,17 @@ import {
     monthColors, 
     monthColorsHover,
     months, 
-    monthDays, 
     deg, 
     fullRadius, 
     notchedRadius30,
     notchedRadiusFeb,
+    notchedRadiusFebLeap,
     svgSize 
 } from '../config/config.js';
 import { rgbToHex } from '../utils/colorUtils.js';
 import { degreesToRadians, sumTo, polarToCartesian } from '../utils/mathUtils.js';
 import { createArcPath } from '../utils/svgUtils.js';
+import { getDaysInMonth } from '../utils/dateUtils.js';
 
 // Calendar state
 const data = [];
@@ -28,6 +29,7 @@ let svg;
 let centerX = svgSize / 2;
 let centerY = svgSize / 2;
 let radius = svgSize / 2;
+let currentYear = new Date().getFullYear();
 
 // Initialize renderer with SVG element
 export function initRenderer(svgElement) {
@@ -35,6 +37,11 @@ export function initRenderer(svgElement) {
     centerX = svgSize / 2;
     centerY = svgSize / 2;
     radius = svgSize / 2;
+}
+
+// Set the year for the calendar
+export function setYear(year) {
+    currentYear = year;
 }
 
 // Draws the calendar with all segments
@@ -65,13 +72,16 @@ export function drawCalendar() {
         labels.push(months[i]);
         
         // Determine outer radius based on month length (notched for shorter months)
-        const days = monthDays[i];
+        const days = getDaysInMonth(i, currentYear);
         let outerRadiusRatio;
         if (days === 31) {
             outerRadiusRatio = fullRadius;
         } else if (days === 28) {
-            // February - more pronounced notch
+            // February with 28 days - more pronounced notch
             outerRadiusRatio = notchedRadiusFeb;
+        } else if (days === 29) {
+            // February with 29 days (leap year) - less pronounced notch
+            outerRadiusRatio = notchedRadiusFebLeap;
         } else {
             // 30-day months - less pronounced notch
             outerRadiusRatio = notchedRadius30;

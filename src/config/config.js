@@ -46,7 +46,8 @@ export const deg = 360 / segments;
 // Notch configuration: shorter months have reduced outer radius
 export const fullRadius = 1.0;  // 31-day months
 export const notchedRadius30 = 0.96; // 30-day months (less pronounced)
-export const notchedRadiusFeb = 0.92; // February (more pronounced)
+export const notchedRadiusFeb = 0.92; // February with 28 days (more pronounced)
+export const notchedRadiusFebLeap = 0.96; // February with 29 days in leap year (less pronounced)
 
 // SVG dimensions
 export const svgSize = 400;
