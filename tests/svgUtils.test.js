@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createArcPath } from '../src/utils/svgUtils.js';
+import { createArcPath, getMoonIlluminatedFraction, getMoonShadowDx } from '../src/utils/svgUtils.js';
 
 describe('svgUtils', () => {
   describe('createArcPath', () => {
@@ -86,6 +86,42 @@ describe('svgUtils', () => {
       const validCommands = ['M', 'L', 'A', 'Z'];
       const hasValidCommand = validCommands.some(cmd => path.includes(cmd));
       expect(hasValidCommand).toBe(true);
+    });
+  });
+
+  describe('moon illumination helpers', () => {
+    it('should report 0 illumination for new moon (phase 0)', () => {
+      expect(getMoonIlluminatedFraction(0)).toBeCloseTo(0, 8);
+    });
+
+    it('should report 1 illumination for full moon (phase 0.5)', () => {
+      expect(getMoonIlluminatedFraction(0.5)).toBeCloseTo(1, 8);
+    });
+
+    it('should report ~0.5 illumination for quarters (0.25 and 0.75)', () => {
+      expect(getMoonIlluminatedFraction(0.25)).toBeCloseTo(0.5, 8);
+      expect(getMoonIlluminatedFraction(0.75)).toBeCloseTo(0.5, 8);
+    });
+
+    it('should return dx=0 for new moon (shadow fully covers)', () => {
+      expect(getMoonShadowDx(10, 0)).toBeCloseTo(0, 8);
+      expect(getMoonShadowDx(10, 1)).toBeCloseTo(0, 8);
+    });
+
+    it('should return |dx| ~= 2r for full moon (shadow moved off)', () => {
+      expect(Math.abs(getMoonShadowDx(10, 0.5))).toBeCloseTo(20, 8);
+    });
+
+    it('should shift shadow left for waxing (positive light on right)', () => {
+      expect(getMoonShadowDx(10, 0.25)).toBeLessThan(0);
+    });
+
+    it('should shift shadow right for waning (positive light on left)', () => {
+      expect(getMoonShadowDx(10, 0.75)).toBeGreaterThan(0);
+    });
+
+    it('should wrap negative phases', () => {
+      expect(getMoonShadowDx(10, -0.25)).toBeCloseTo(getMoonShadowDx(10, 0.75), 8);
     });
   });
 });

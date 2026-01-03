@@ -19,9 +19,9 @@ import {
 } from '../config/config.js';
 import { rgbToHex } from '../utils/colorUtils.js';
 import { degreesToRadians, sumTo, polarToCartesian } from '../utils/mathUtils.js';
-import { createArcPath } from '../utils/svgUtils.js';
+import { createArcPath, getMoonShadowDx } from '../utils/svgUtils.js';
 import { getDaysInMonth } from '../utils/dateUtils.js';
-import { getMoonPhaseAngle, getMoonPhaseName } from '../utils/moonPhase.js';
+import { getMoonPhase, getMoonPhaseAngle, getMoonPhaseName } from '../utils/moonPhase.js';
 
 // Calendar state
 const data = [];
@@ -55,6 +55,7 @@ let centerX = svgSize / 2;
 let centerY = svgSize / 2;
 let radius = svgSize / 2;
 let currentYear = new Date().getFullYear();
+let moonClipIdCounter = 0;
 
 // Initialize renderer with SVG element
 export function initRenderer(svgElement) {
@@ -345,6 +346,7 @@ export function showSunAndMoonForDate(date) {
     const sunPos = polarToCartesian(centerX, centerY, sunRadius, normalizedAngle);
     
     // Calculate moon phase for this specific date
+    const moonPhase = getMoonPhase(date);
     const moonPhaseAngle = getMoonPhaseAngle(date);
     
     // Moon position: sun angle - moon phase angle
@@ -354,7 +356,7 @@ export function showSunAndMoonForDate(date) {
     const moonRadius = radius + moonDistance;
     const moonPos = polarToCartesian(centerX, centerY, moonRadius, moonAngle);
     
-    showSunAndMoon(sunPos, moonPos, true);
+    showSunAndMoon(sunPos, moonPos, true, moonPhase);
 }
 
 // Selects a specific date (used by external views, e.g. month view)
@@ -438,6 +440,7 @@ function handleMonthHover(event, monthIndex) {
     
     // Calculate moon phase for the specific day under cursor
     const moonDate = new Date(currentYear, monthIndex, dayInMonth);
+    const moonPhase = getMoonPhase(moonDate);
     const moonPhaseAngle = getMoonPhaseAngle(moonDate);
     
     // Moon position: sun angle - moon phase angle
@@ -446,11 +449,11 @@ function handleMonthHover(event, monthIndex) {
     const moonRadius = radius + moonDistance;
     const moonPos = polarToCartesian(centerX, centerY, moonRadius, moonAngle);
     
-    showSunAndMoon(sunPos, moonPos);
+    showSunAndMoon(sunPos, moonPos, false, moonPhase);
 }
 
 // Creates or updates sun and moon SVG elements
-function showSunAndMoon(sunPos, moonPos, makeDraggable = false) {
+function showSunAndMoon(sunPos, moonPos, makeDraggable = false, moonPhase = null) {
     // Remove existing elements
     hideSunAndMoon();
     
@@ -491,18 +494,57 @@ function showSunAndMoon(sunPos, moonPos, makeDraggable = false) {
     sunCircle.setAttribute("stroke-width", "1");
     sunGroup.appendChild(sunCircle);
     
-    // Create moon icon (circle)
-    const moonCircle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    moonCircle.setAttribute("cx", moonPos[0]);
-    moonCircle.setAttribute("cy", moonPos[1]);
-    moonCircle.setAttribute("r", "6");
-    moonCircle.setAttribute("fill", "#e0e0e0");
-    moonCircle.setAttribute("stroke", "#999");
-    moonCircle.setAttribute("stroke-width", "1");
-    moonCircle.setAttribute("class", "moon-icon");
+    // Create moon icon (white disc with clipped black shadow circle)
+    const moonGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    moonGroup.setAttribute("class", "moon-icon");
+    moonGroup.setAttribute("transform", `translate(${moonPos[0]}, ${moonPos[1]})`);
+
+    const moonRadius = 6;
+
+    const clipId = `moon-clip-${moonClipIdCounter++}`;
+    const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+    const clipPath = document.createElementNS("http://www.w3.org/2000/svg", "clipPath");
+    clipPath.setAttribute("id", clipId);
+    const clipCircle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    clipCircle.setAttribute("cx", "0");
+    clipCircle.setAttribute("cy", "0");
+    clipCircle.setAttribute("r", String(moonRadius));
+    clipPath.appendChild(clipCircle);
+    defs.appendChild(clipPath);
+    moonGroup.appendChild(defs);
+
+    const moonDisc = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    moonDisc.setAttribute("cx", "0");
+    moonDisc.setAttribute("cy", "0");
+    moonDisc.setAttribute("r", String(moonRadius));
+    moonDisc.setAttribute("fill", "#f5f5f5");
+    moonDisc.setAttribute("class", "moon-icon__disc");
+    moonGroup.appendChild(moonDisc);
+
+    const phaseValue = Number.isFinite(Number(moonPhase)) ? Number(moonPhase) : 0;
+    const shadowDx = getMoonShadowDx(moonRadius, phaseValue);
+
+    const moonShadow = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    moonShadow.setAttribute("cx", String(shadowDx));
+    moonShadow.setAttribute("cy", "0");
+    moonShadow.setAttribute("r", String(moonRadius));
+    moonShadow.setAttribute("fill", "#111");
+    moonShadow.setAttribute("clip-path", `url(#${clipId})`);
+    moonShadow.setAttribute("class", "moon-icon__shadow");
+    moonGroup.appendChild(moonShadow);
+
+    const moonOutline = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    moonOutline.setAttribute("cx", "0");
+    moonOutline.setAttribute("cy", "0");
+    moonOutline.setAttribute("r", String(moonRadius));
+    moonOutline.setAttribute("fill", "none");
+    moonOutline.setAttribute("stroke", "#999");
+    moonOutline.setAttribute("stroke-width", "1");
+    moonOutline.setAttribute("class", "moon-icon__outline");
+    moonGroup.appendChild(moonOutline);
     
     svg.appendChild(sunGroup);
-    svg.appendChild(moonCircle);
+    svg.appendChild(moonGroup);
     
     // Add drag handlers if draggable
     if (makeDraggable) {
@@ -619,6 +661,7 @@ function setupSunDragHandlers(sunGroup) {
         const sunPos = polarToCartesian(centerX, centerY, sunRadius, angle);
         
         const moonPhaseAngle = getMoonPhaseAngle(date);
+        const moonPhase = getMoonPhase(date);
         const moonAngle = angle - moonPhaseAngle;
         const moonRadius = radius + moonDistance;
         const moonPos = polarToCartesian(centerX, centerY, moonRadius, moonAngle);
@@ -626,11 +669,17 @@ function setupSunDragHandlers(sunGroup) {
         // Update sun position
         sunGroup.setAttribute("transform", `translate(${sunPos[0]}, ${sunPos[1]})`);
         
-        // Update moon position
-        const moonCircle = svg.querySelector('.moon-icon');
-        if (moonCircle) {
-            moonCircle.setAttribute("cx", moonPos[0]);
-            moonCircle.setAttribute("cy", moonPos[1]);
+        // Update moon position + phase shading
+        const moonGroup = svg.querySelector('.moon-icon');
+        if (moonGroup) {
+            moonGroup.setAttribute("transform", `translate(${moonPos[0]}, ${moonPos[1]})`);
+
+            const moonIconRadius = 6;
+            const shadowDx = getMoonShadowDx(moonIconRadius, moonPhase);
+            const shadow = moonGroup.querySelector?.('.moon-icon__shadow');
+            if (shadow) {
+                shadow.setAttribute('cx', String(shadowDx));
+            }
         }
     };
     
