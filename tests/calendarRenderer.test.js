@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { initRenderer, drawCalendar, drawCircle, writeSegmentName, setYear, subscribeToDateChanges } from '../src/renderer/calendarRenderer.js';
+import { initRenderer, drawCalendar, drawCircle, writeSegmentName, setYear, subscribeToDateChanges, selectDate } from '../src/renderer/calendarRenderer.js';
 import { segments, svgSize } from '../src/config/config.js';
 
 describe('calendarRenderer', () => {
@@ -256,6 +256,37 @@ describe('calendarRenderer', () => {
       expect(last.getFullYear()).toBe(2000);
       expect(last.getMonth()).toBe(5);
       expect(last.getDate()).toBe(15);
+    });
+  });
+
+  describe('selectDate', () => {
+    it('should move the sun, update centre text, and notify subscribers', () => {
+      initRenderer(mockSvg);
+      drawCalendar();
+
+      const seen = [];
+      const unsubscribe = subscribeToDateChanges((date) => {
+        seen.push(date);
+      });
+
+      const date = new Date(2026, 0, 10);
+      selectDate(date);
+
+      unsubscribe();
+
+      const sun = mockSvg.querySelector('.sun-icon');
+      const moon = mockSvg.querySelector('.moon-icon');
+      expect(sun).not.toBeNull();
+      expect(moon).not.toBeNull();
+
+      const centreTexts = Array.from(mockSvg.querySelectorAll('.center-text')).map((el) => el.textContent);
+      expect(centreTexts.some((t) => t === 'JAN 10')).toBe(true);
+
+      expect(seen.length).toBeGreaterThanOrEqual(1);
+      const last = seen[seen.length - 1];
+      expect(last.getFullYear()).toBe(2026);
+      expect(last.getMonth()).toBe(0);
+      expect(last.getDate()).toBe(10);
     });
   });
 });

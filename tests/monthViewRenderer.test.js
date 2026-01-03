@@ -35,5 +35,29 @@ describe('monthViewRenderer', () => {
     expect(todayEl).not.toBeNull();
     expect(todayEl.getAttribute('data-iso-date')).toBe('2026-01-20');
   });
+
+  it('should call onSelectDate when a day is clicked', () => {
+    const selectedDate = new Date(2026, 0, 15);
+    const today = new Date(2026, 0, 20);
+    const seen = [];
+
+    renderMonthView(container, selectedDate, {
+      today,
+      weekStartsOn: 1,
+      locale: 'en-GB',
+      onSelectDate: (date) => seen.push(date)
+    });
+
+    const button = container.querySelector('[data-iso-date="2026-01-10"]');
+    expect(button).not.toBeNull();
+
+    button.click();
+
+    expect(seen.length).toBe(1);
+    expect(seen[0]).toBeInstanceOf(Date);
+    expect(seen[0].getFullYear()).toBe(2026);
+    expect(seen[0].getMonth()).toBe(0);
+    expect(seen[0].getDate()).toBe(10);
+  });
 });
 
