@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { initRenderer, drawCalendar, drawCircle, writeSegmentName } from '../src/renderer/calendarRenderer.js';
+import { initRenderer, drawCalendar, drawCircle, writeSegmentName, setYear, subscribeToDateChanges } from '../src/renderer/calendarRenderer.js';
 import { segments, svgSize } from '../src/config/config.js';
 
 describe('calendarRenderer', () => {
@@ -234,6 +234,28 @@ describe('calendarRenderer', () => {
         const text = mockSvg.querySelector('.center-text');
         expect(text.textContent).toBe(month);
       });
+    });
+  });
+
+  describe('subscribeToDateChanges', () => {
+    it('should notify subscribers when setYear chooses the mid-year date', () => {
+      initRenderer(mockSvg);
+      drawCalendar();
+
+      const seen = [];
+      const unsubscribe = subscribeToDateChanges((date) => {
+        seen.push(date);
+      });
+
+      setYear(2000); // not current year => uses mid-year date (June 15)
+
+      unsubscribe();
+
+      expect(seen.length).toBeGreaterThanOrEqual(1);
+      const last = seen[seen.length - 1];
+      expect(last.getFullYear()).toBe(2000);
+      expect(last.getMonth()).toBe(5);
+      expect(last.getDate()).toBe(15);
     });
   });
 });

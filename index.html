@@ -11,9 +11,12 @@
       <label for="year-input">Year:</label>
       <input type="number" id="year-input" min="1900" max="2100" value="2024">
     </div>
-	<div id="calendar-container">
-      <svg id="calendar-svg" xmlns="http://www.w3.org/2000/svg"></svg>
-    </div>
+	<div id="calendar-layout">
+	  <div id="calendar-container">
+        <svg id="calendar-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+	  <div id="month-view-container"></div>
+	</div>
 	
 	<script type="module" src="src/main.js"></script>
   </body>
