@@ -9,6 +9,7 @@ A modern SVG-based circular calendar visualisation with seasonal colour gradient
 - **Interactive**: Hover and click segments to see month names in the centre
 - **Responsive**: Scales beautifully with SVG viewBox
 - **Modern Architecture**: Modular ES6 codebase for maintainability
+- **Web component**: Use the calendar as a standalone `<circular-calendar>` custom element, with a selected date value that can be submitted in a form
 
 ## Setup
 
@@ -159,4 +160,31 @@ Modern browsers with ES6 module support:
 - [ ] Date information display
 - [ ] Event/calendar data integration
 - [ ] Customisable colour schemes
+
+## Web component usage
+
+The project ships a standalone custom element: `<circular-calendar>`.
+
+- **Selected date input**: set/read via the `value` attribute/property (`YYYY-MM-DD`)
+- **Form submission**: set `name` and the selected date will be included in `FormData`
+
+Example:
+
+```html
+<form id="demo">
+  <circular-calendar name="selectedDate" value="2026-01-15"></circular-calendar>
+  <button type="submit">Submit</button>
+</form>
+
+<script type="module">
+  import { defineCircularCalendarElement } from './src/web-components/circularCalendarElement.js';
+  defineCircularCalendarElement();
+
+  document.getElementById('demo').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    console.log(fd.get('selectedDate'));
+  });
+</script>
+```
 
