@@ -90,10 +90,30 @@ describe('moonPhase', () => {
       expect(name.toLowerCase()).toContain('new');
     });
 
+    it('should allow some leeway around new moon', () => {
+      // Within ~36 hours either side of new moon should still be classified as New Moon.
+      // This helps avoid "Waxing/Waning" being reported on the day people perceive as new.
+      const newMoonDate = new Date(Date.UTC(2024, 0, 11, 11, 57));
+      const before = new Date(newMoonDate.getTime() - 36 * 60 * 60 * 1000);
+      const after = new Date(newMoonDate.getTime() + 36 * 60 * 60 * 1000);
+      expect(getMoonPhaseName(before).toLowerCase()).toContain('new');
+      expect(getMoonPhaseName(after).toLowerCase()).toContain('new');
+    });
+
     it('should return "Full Moon" for phase near 0.5', () => {
       const fullMoonDate = new Date(Date.UTC(2024, 0, 25, 17, 54));
       const name = getMoonPhaseName(fullMoonDate);
       expect(name.toLowerCase()).toContain('full');
+    });
+
+    it('should allow some leeway around full moon', () => {
+      // Within ~36 hours either side of full moon should still be classified as Full Moon.
+      // This is intentionally forgiving, because the simplified phase model can be off.
+      const fullMoonDate = new Date(Date.UTC(2024, 0, 25, 17, 54));
+      const before = new Date(fullMoonDate.getTime() - 36 * 60 * 60 * 1000);
+      const after = new Date(fullMoonDate.getTime() + 36 * 60 * 60 * 1000);
+      expect(getMoonPhaseName(before).toLowerCase()).toContain('full');
+      expect(getMoonPhaseName(after).toLowerCase()).toContain('full');
     });
 
     it('should return valid phase names', () => {
