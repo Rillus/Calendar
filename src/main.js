@@ -3,7 +3,7 @@
 /********/
 
 import { svgSize } from './config/config.js';
-import { initRenderer, drawCalendar, drawCircle, setYear } from './renderer/calendarRenderer.js';
+import { initRenderer, drawCalendar, drawCircle, setYear, showSunAndMoonForDate } from './renderer/calendarRenderer.js';
 
 function init() {
     const svg = document.getElementById("calendar-svg");
@@ -35,6 +35,12 @@ function init() {
     drawCalendar();
     drawCircle();
     
+    // Show sun and moon for today's date
+    const today = new Date();
+    if (currentYear === today.getFullYear()) {
+        showSunAndMoonForDate(today);
+    }
+    
     // Handle year changes
     yearInput.addEventListener("input", (e) => {
         const year = parseInt(e.target.value, 10);
@@ -42,6 +48,10 @@ function init() {
             setYear(year);
             drawCalendar();
             drawCircle();
+            // Show sun and moon for today if viewing current year
+            if (year === today.getFullYear()) {
+                showSunAndMoonForDate(today);
+            }
         }
     });
     

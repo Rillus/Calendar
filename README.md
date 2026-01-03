@@ -103,7 +103,9 @@ This project uses **TDD (Test-Driven Development)** as the primary development m
    - **Red**: Write a failing test
    - **Green**: Write the minimum code to make it pass
    - **Refactor**: Improve the code while keeping tests green
-3. **Run tests**: Use `npm test` to run the test suite
+3. **Run tests**: 
+   - `npm test` - Run tests once and exit
+   - `npm run test:watch` - Run tests in watch mode
 
 ### Running Tests
 

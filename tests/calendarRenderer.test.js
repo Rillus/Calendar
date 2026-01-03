@@ -129,9 +129,13 @@ describe('calendarRenderer', () => {
       drawCircle();
       const circle = mockSvg.querySelector('.center-circle');
       
+      // Calculate expected radius: (svgSize / 2) - sunDistance - padding
+      const expectedRadius = (svgSize / 2) - 50 - 10; // sunDistance = 50, padding = 10
+      const expectedInnerRadius = expectedRadius / 3;
+      
       expect(circle.getAttribute('cx')).toBe(String(svgSize / 2));
       expect(circle.getAttribute('cy')).toBe(String(svgSize / 2));
-      expect(circle.getAttribute('r')).toBe(String(svgSize / 3));
+      expect(circle.getAttribute('r')).toBe(String(expectedInnerRadius));
       expect(circle.getAttribute('fill')).toBe('#ffffff');
     });
 

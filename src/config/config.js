@@ -52,3 +52,8 @@ export const notchedRadiusFebLeap = 0.96; // February with 29 days in leap year 
 // SVG dimensions
 export const svgSize = 400;
 
+// Space needed for sun and moon outside calendar
+export const sunDistance = 50; // Sun appears 50px outside calendar
+export const moonDistance = 20; // Moon appears 20px outside calendar
+export const padding = 10; // Padding from SVG edge
+

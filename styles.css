@@ -100,6 +100,18 @@ body {
     pointer-events: none;
     font-weight: 500;
   }
+  
+  .sun-icon {
+    pointer-events: none;
+    opacity: 0.9;
+    filter: drop-shadow(0 0 3px rgba(255, 215, 0, 0.5));
+  }
+  
+  .moon-icon {
+    pointer-events: none;
+    opacity: 0.9;
+    filter: drop-shadow(0 0 2px rgba(128, 128, 128, 0.5));
+  }
 }
 
 /* Month Colour Classes */
