@@ -35,6 +35,15 @@ body {
   color: #333;
 }
 
+/* Layout: circular calendar + month view */
+#calendar-layout {
+  width: min(100%, 980px);
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
 /* Calendar Controls */
 #calendar-controls {
   margin-bottom: 20px;
@@ -68,6 +77,65 @@ body {
   width: min(100%, 600px);
   aspect-ratio: 1;
   margin: 0 auto;
+}
+
+/* Month view */
+#month-view-container {
+  width: min(100%, 360px);
+  margin: 0 auto;
+}
+
+.month-view {
+  background: #fff;
+  border: 1px solid #e6e6e6;
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.month-view__heading {
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.month-view__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.month-view__weekday {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #666;
+  text-align: center;
+  padding: 6px 0;
+}
+
+.month-view__day {
+  border: 1px solid #eee;
+  background: #fff;
+  border-radius: 8px;
+  padding: 10px 0;
+  text-align: center;
+  font-size: 0.95rem;
+  cursor: default;
+  color: #222;
+}
+
+.month-view__day--outside {
+  color: #aaa;
+  background: #fafafa;
+}
+
+.month-view__day--today {
+  border-color: #48589a;
+}
+
+.month-view__day--selected {
+  background: #48589a;
+  border-color: #48589a;
+  color: #fff;
 }
 
 /* SVG Calendar */
@@ -371,6 +439,16 @@ body {
   
   #calendar-container {
     width: 100%;
+  }
+  
+  #month-view-container {
+    width: 100%;
+  }
+}
+
+@media (min-width: 900px) {
+  #calendar-layout {
+    grid-template-columns: 1fr 360px;
   }
 }
 

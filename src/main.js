@@ -3,11 +3,13 @@
 /********/
 
 import { svgSize } from './config/config.js';
-import { initRenderer, drawCalendar, drawCircle, setYear, showSunAndMoonForDate, writeSegmentName } from './renderer/calendarRenderer.js';
+import { initRenderer, drawCalendar, drawCircle, setYear, showSunAndMoonForDate, subscribeToDateChanges } from './renderer/calendarRenderer.js';
+import { renderMonthView } from './renderer/monthViewRenderer.js';
 
 function init() {
     const svg = document.getElementById("calendar-svg");
     const yearInput = document.getElementById("year-input");
+    const monthViewContainer = document.getElementById("month-view-container");
     
     if (!svg) {
         console.error("SVG element not found");
@@ -16,6 +18,11 @@ function init() {
     
     if (!yearInput) {
         console.error("Year input not found");
+        return;
+    }
+
+    if (!monthViewContainer) {
+        console.error("Month view container not found");
         return;
     }
     
@@ -34,6 +41,15 @@ function init() {
     const currentYear = new Date().getFullYear();
     yearInput.value = currentYear;
     setYear(currentYear);
+
+    // Render month view (defaults to current month)
+    const today = new Date();
+    renderMonthView(monthViewContainer, today, { weekStartsOn: 1, locale: 'en-GB' });
+
+    // Keep month view in sync with circular calendar's current date
+    subscribeToDateChanges((date) => {
+        renderMonthView(monthViewContainer, date, { weekStartsOn: 1, locale: 'en-GB' });
+    });
     
     // Handle year changes
     yearInput.addEventListener("input", (e) => {
@@ -43,8 +59,9 @@ function init() {
             drawCalendar();
             drawCircle();
             // Show sun and moon for today if viewing current year
-            if (year === today.getFullYear()) {
-                showSunAndMoonForDate(today);
+            const now = new Date();
+            if (year === now.getFullYear()) {
+                showSunAndMoonForDate(now);
             }
         }
     });

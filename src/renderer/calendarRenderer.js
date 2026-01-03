@@ -28,6 +28,27 @@ const data = [];
 const labels = [];
 const colours = [];
 
+// Date change listeners (used by external views, e.g. month view)
+const dateChangeListeners = new Set();
+
+const notifyDateChanged = (date) => {
+    const safeDate = new Date(date.getTime());
+    for (const listener of dateChangeListeners) {
+        try {
+            listener(safeDate);
+        } catch (err) {
+            // Avoid breaking rendering if a listener throws
+            console.error('Date change listener failed', err);
+        }
+    }
+};
+
+// Subscribe to date changes (e.g. when the sun is dragged or year changes)
+export function subscribeToDateChanges(listener) {
+    dateChangeListeners.add(listener);
+    return () => dateChangeListeners.delete(listener);
+}
+
 // SVG container and dimensions
 let svg;
 let centerX = svgSize / 2;
@@ -55,12 +76,14 @@ export function setYear(year) {
         showSunAndMoonForDate(today);
         // Display today's date in center text
         writeSegmentName(labels[today.getMonth()], today);
+        notifyDateChanged(today);
     } else {
         // Show sun and moon for middle of the year if not current year
         const midYearDate = new Date(year, 5, 15); // June 15
         showSunAndMoonForDate(midYearDate);
         // Display mid-year date in center text
         writeSegmentName(labels[midYearDate.getMonth()], midYearDate);
+        notifyDateChanged(midYearDate);
     }
 }
 
@@ -579,6 +602,7 @@ function setupSunDragHandlers(sunGroup) {
         // Create date and update display
         const date = new Date(currentYear, monthIndex, dayInMonth);
         writeSegmentName(labels[monthIndex], date);
+        notifyDateChanged(date);
         
         // Update sun and moon positions
         const sunRadius = radius + sunDistance;
