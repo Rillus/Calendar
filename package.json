@@ -16,6 +16,10 @@
     "svg",
     "visualisation"
   ],
+  "engines": {
+    "node": "20.x",
+    "npm": "10.x"
+  },
   "author": "",
   "license": "MIT",
   "devDependencies": {
