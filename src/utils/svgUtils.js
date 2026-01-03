@@ -99,10 +99,16 @@ export function createMoonIlluminatedPath(centerX, centerY, radius, phase) {
     // Waxing: lit on the right. Waning: lit on the left.
     const isWaxing = p < 0.5;
     const limbSweep = isWaxing ? 1 : 0;
-    const terminatorSweep = limbSweep ? 0 : 1;
+
+    // Crescents and gibbous phases need opposite terminator curvature:
+    // - crescents: terminator bulges away from the lit side (to form a thin sliver)
+    // - gibbous: terminator bulges with the lit side (shadow is the smaller portion)
+    const isGibbous = illuminatedFraction > 0.5;
+    const terminatorSweep = isWaxing
+        ? (isGibbous ? 0 : 1) // waxing gibbous bulges right, waxing crescent bulges left
+        : (isGibbous ? 1 : 0); // waning gibbous bulges left, waning crescent bulges right
 
     // Gibbous phases use the longer ellipse arc for the terminator.
-    const isGibbous = Math.cos(angle) < 0;
     const largeArcFlag = isGibbous ? 1 : 0;
 
     return [

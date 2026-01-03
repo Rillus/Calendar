@@ -127,6 +127,27 @@ describe('svgUtils', () => {
       const d2 = createMoonIlluminatedPath(0, 0, 10, 0.5);
       expect(d1).toBe(d2);
     });
+
+    it('should flip the terminator sweep between crescent and gibbous (waxing)', () => {
+      // Waxing crescent: terminator should bulge opposite the lit side.
+      const crescent = createMoonIlluminatedPath(0, 0, 10, 0.1);
+      // Waxing gibbous: terminator should bulge with the lit side.
+      const gibbous = createMoonIlluminatedPath(0, 0, 10, 0.4);
+      expect(typeof crescent).toBe('string');
+      expect(typeof gibbous).toBe('string');
+      // Terminator is the second arc. Extract "... A <rx> 10 0 <largeArc> <sweep> ..."
+      expect(crescent).toMatch(/A [^ ]+ 10 0 [01] 1 0 -10/);
+      expect(gibbous).toMatch(/A [^ ]+ 10 0 [01] 0 0 -10/);
+    });
+
+    it('should flip the terminator sweep between crescent and gibbous (waning)', () => {
+      const gibbous = createMoonIlluminatedPath(0, 0, 10, 0.6);
+      const crescent = createMoonIlluminatedPath(0, 0, 10, 0.9);
+      expect(typeof crescent).toBe('string');
+      expect(typeof gibbous).toBe('string');
+      expect(crescent).toMatch(/A [^ ]+ 10 0 [01] 0 0 -10/);
+      expect(gibbous).toMatch(/A [^ ]+ 10 0 [01] 1 0 -10/);
+    });
   });
 });
 
