@@ -353,9 +353,13 @@ export function createCalendarRenderer(svgElement) {
 
   const setupMonthDayRingDragHandlers = (dayGroup, monthIndex, days) => {
     let isDragging = false;
+    let isDragActive = false;
+    let didDrag = false;
+    let suppressNextClick = false;
     let startPointerAngle = 0;
     let startRotation = 0;
     let rotation = 0;
+    const dragThresholdRadians = 0.04; // ~2.3 degrees
 
     const applyRotation = (nextRotation) => {
       rotation = nextRotation;
@@ -372,17 +376,25 @@ export function createCalendarRenderer(svgElement) {
 
     dayGroup.addEventListener('mousedown', (e) => {
       isDragging = true;
+      isDragActive = false;
+      didDrag = false;
       startPointerAngle = getAngleFromEvent(e);
       startRotation = rotation;
-      dayGroup.style.cursor = 'grabbing';
-      e.preventDefault();
-      e.stopPropagation();
+      // Don't preventDefault here: it can interfere with click selection on day segments.
     });
 
     const handleMouseMove = (e) => {
       if (!isDragging) return;
       const angle = getAngleFromEvent(e);
       const delta = normaliseDeltaRadians(angle - startPointerAngle);
+      if (!isDragActive) {
+        if (Math.abs(delta) < dragThresholdRadians) return;
+        isDragActive = true;
+        didDrag = true;
+        dayGroup.style.cursor = 'grabbing';
+      } else {
+        didDrag = true;
+      }
       applyRotation(startRotation + delta);
       e.preventDefault();
     };
@@ -391,6 +403,7 @@ export function createCalendarRenderer(svgElement) {
       if (!isDragging) return;
       isDragging = false;
       dayGroup.style.cursor = 'grab';
+      if (didDrag) suppressNextClick = true;
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -398,15 +411,25 @@ export function createCalendarRenderer(svgElement) {
 
     dayGroup.addEventListener('touchstart', (e) => {
       isDragging = true;
+      isDragActive = false;
+      didDrag = false;
       startPointerAngle = getAngleFromEvent(e);
       startRotation = rotation;
-      e.preventDefault();
+      // Don't preventDefault here: it can suppress the synthetic click on tap.
     }, { passive: false });
 
     document.addEventListener('touchmove', (e) => {
       if (!isDragging) return;
       const angle = getAngleFromEvent(e);
       const delta = normaliseDeltaRadians(angle - startPointerAngle);
+      if (!isDragActive) {
+        if (Math.abs(delta) < dragThresholdRadians) return;
+        isDragActive = true;
+        didDrag = true;
+        dayGroup.style.cursor = 'grabbing';
+      } else {
+        didDrag = true;
+      }
       applyRotation(startRotation + delta);
       e.preventDefault();
     }, { passive: false });
@@ -414,7 +437,16 @@ export function createCalendarRenderer(svgElement) {
     document.addEventListener('touchend', () => {
       if (!isDragging) return;
       isDragging = false;
+      if (didDrag) suppressNextClick = true;
     }, { passive: true });
+
+    // If the user dragged the ring, suppress the next click so it doesn't "pick a day" accidentally.
+    dayGroup.addEventListener('click', (e) => {
+      if (!suppressNextClick) return;
+      suppressNextClick = false;
+      e.preventDefault();
+      e.stopPropagation();
+    }, { capture: true });
 
     dayGroup.style.cursor = 'grab';
     dayGroup.style.pointerEvents = 'all';
