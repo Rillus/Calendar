@@ -293,6 +293,8 @@ describe('calendarRenderer', () => {
   describe('month -> day selection view', () => {
     beforeEach(() => {
       initRenderer(mockSvg);
+      // Drag handlers rely on viewBox for coordinate transforms.
+      mockSvg.setAttribute('viewBox', `0 0 ${svgSize} ${svgSize}`);
       drawCalendar();
     });
 
@@ -350,6 +352,59 @@ describe('calendarRenderer', () => {
       expect(last.getFullYear()).toBe(2026);
       expect(last.getMonth()).toBe(0);
       expect(last.getDate()).toBe(15);
+    });
+
+    it('should allow dragging the month day ring to change the selected date while the sun remains static', () => {
+      // Make SVG coordinate transforms deterministic in jsdom.
+      mockSvg.getBoundingClientRect = () => ({
+        left: 0,
+        top: 0,
+        width: svgSize,
+        height: svgSize,
+        right: svgSize,
+        bottom: svgSize,
+        x: 0,
+        y: 0,
+        toJSON() { return {}; }
+      });
+
+      // Fix the year and an initial selected date (so we can verify it changes).
+      setYear(2026);
+      selectDate(new Date(2026, 0, 15));
+
+      const seen = [];
+      const unsubscribe = subscribeToDateChanges((date) => seen.push(date));
+      seen.length = 0;
+
+      // Enter month day ring (January).
+      const janPath = mockSvg.querySelector('.segments-group path[data-segment-index="0"]');
+      janPath.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+      const dayGroup = mockSvg.querySelector('.day-segments-group');
+      expect(dayGroup).not.toBeNull();
+
+      const sun = mockSvg.querySelector('.sun-icon');
+      expect(sun).not.toBeNull();
+      const sunTransformBefore = sun.getAttribute('transform');
+
+      const centre = svgSize / 2;
+      const startEvent = new MouseEvent('mousedown', { bubbles: true, clientX: centre + 100, clientY: centre });
+      dayGroup.dispatchEvent(startEvent);
+
+      // Rotate by ~90 degrees.
+      document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: centre, clientY: centre + 100 }));
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+
+      unsubscribe();
+
+      expect(seen.length).toBeGreaterThanOrEqual(1);
+      const last = seen[seen.length - 1];
+      expect(last.getFullYear()).toBe(2026);
+      expect(last.getMonth()).toBe(0);
+      expect(last.getDate()).not.toBe(15);
+
+      const sunTransformAfter = mockSvg.querySelector('.sun-icon')?.getAttribute('transform');
+      expect(sunTransformAfter).toBe(sunTransformBefore);
     });
   });
 });
