@@ -25,14 +25,11 @@ import { getMoonPhase, getMoonPhaseAngle, getMoonPhaseName } from '../utils/moon
 
 const createSafeDateCopy = (date) => new Date(date.getTime());
 const normaliseTwelveHourClock = (value) => {
-  // New API: boolean (true => 12h, false => 24h)
   if (typeof value === 'boolean') return value;
 
-  // Back-compat for previous string/number usage
   const raw = String(value ?? '').trim().toLowerCase();
-  if (raw === '') return false;
-  if (raw === '12' || raw === 'true' || raw === '1') return true;
-  if (raw === '24' || raw === 'false' || raw === '0') return false;
+  if (raw === '' || raw === 'false' || raw === '0') return false;
+  if (raw === 'true' || raw === '1') return true;
   return false;
 };
 
@@ -56,7 +53,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
   let activeView = 'year';
   let activeMonthIndex = null;
   let timeSelectionEnabled = Boolean(options.timeSelectionEnabled);
-  let useTwelveHourClock = normaliseTwelveHourClock(options.is12HourClock ?? options.clockFormat);
+  let useTwelveHourClock = normaliseTwelveHourClock(options.is12HourClock);
   let pendingDate = null;
   let pendingMeridiem = 'AM'; // only used in 12h mode
   let pendingHour24 = 0;
@@ -937,7 +934,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
 
   const setTimeSelectionOptions = (next = {}) => {
     timeSelectionEnabled = Boolean(next.timeSelectionEnabled);
-    useTwelveHourClock = normaliseTwelveHourClock(next.is12HourClock ?? next.clockFormat);
+    useTwelveHourClock = normaliseTwelveHourClock(next.is12HourClock);
     // If options change mid-flow, reset any in-progress selection overlays.
     pendingDate = null;
     clearTimeSelectionView();

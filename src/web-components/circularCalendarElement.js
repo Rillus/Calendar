@@ -47,14 +47,11 @@ const parseBooleanAttributeValue = (value) => {
   const raw = String(value).trim().toLowerCase();
   if (raw === '' || raw === 'true' || raw === '1') return true;
   if (raw === 'false' || raw === '0') return false;
-  // Back-compat for old "12"/"24" clock-format values.
-  if (raw === '12') return true;
-  if (raw === '24') return false;
   return true;
 };
 
 export class CircularCalendarElement extends HTMLElement {
-  static observedAttributes = ['value', 'name', 'include-time', 'is12hourclock', 'clock-format'];
+  static observedAttributes = ['value', 'name', 'include-time', 'is12hourclock'];
 
   constructor() {
     super();
@@ -167,12 +164,10 @@ export class CircularCalendarElement extends HTMLElement {
       return;
     }
 
-    if (name === 'include-time' || name === 'is12hourclock' || name === 'clock-format') {
+    if (name === 'include-time' || name === 'is12hourclock') {
       this._renderer?.setTimeSelectionOptions?.({
         timeSelectionEnabled: this.includeTime,
-        is12HourClock: this.is12HourClock,
-        // Back-compat: if someone is still setting clock-format, preserve behaviour.
-        clockFormat: this.clockFormat
+        is12HourClock: this.is12HourClock
       });
       // Re-apply to ensure attribute/value formatting matches the current mode.
       if (this._selectedDate) {
@@ -210,18 +205,6 @@ export class CircularCalendarElement extends HTMLElement {
     const enabled = Boolean(next);
     if (enabled) this.setAttribute('is12HourClock', '');
     else this.removeAttribute('is12HourClock');
-  }
-
-  // Backwards compatible alias (deprecated): previously called `clockFormat` and driven by `clock-format`.
-  get clockFormat() {
-    if (this.hasAttribute('is12HourClock')) return this.is12HourClock;
-    if (!this.hasAttribute('clock-format')) return false;
-    return parseBooleanAttributeValue(this.getAttribute('clock-format'));
-  }
-
-  set clockFormat(next) {
-    // Prefer setting the new attribute.
-    this.is12HourClock = Boolean(next);
   }
 
   get value() {
