@@ -56,7 +56,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
   let activeView = 'year';
   let activeMonthIndex = null;
   let timeSelectionEnabled = Boolean(options.timeSelectionEnabled);
-  let useTwelveHourClock = normaliseTwelveHourClock(options.clockFormat);
+  let useTwelveHourClock = normaliseTwelveHourClock(options.is12HourClock ?? options.clockFormat);
   let pendingDate = null;
   let pendingMeridiem = 'AM'; // only used in 12h mode
   let pendingHour24 = 0;
@@ -937,7 +937,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
 
   const setTimeSelectionOptions = (next = {}) => {
     timeSelectionEnabled = Boolean(next.timeSelectionEnabled);
-    useTwelveHourClock = normaliseTwelveHourClock(next.clockFormat);
+    useTwelveHourClock = normaliseTwelveHourClock(next.is12HourClock ?? next.clockFormat);
     // If options change mid-flow, reset any in-progress selection overlays.
     pendingDate = null;
     clearTimeSelectionView();

@@ -54,7 +54,7 @@ const parseBooleanAttributeValue = (value) => {
 };
 
 export class CircularCalendarElement extends HTMLElement {
-  static observedAttributes = ['value', 'name', 'include-time', 'clock-format'];
+  static observedAttributes = ['value', 'name', 'include-time', 'is12hourclock', 'clock-format'];
 
   constructor() {
     super();
@@ -118,7 +118,7 @@ export class CircularCalendarElement extends HTMLElement {
 
     this._renderer = createCalendarRenderer(this._svg, {
       timeSelectionEnabled: this.includeTime,
-      clockFormat: this.clockFormat
+      is12HourClock: this.is12HourClock
     });
     this._renderer.drawCalendar();
     this._renderer.drawCircle();
@@ -167,9 +167,11 @@ export class CircularCalendarElement extends HTMLElement {
       return;
     }
 
-    if (name === 'include-time' || name === 'clock-format') {
+    if (name === 'include-time' || name === 'is12hourclock' || name === 'clock-format') {
       this._renderer?.setTimeSelectionOptions?.({
         timeSelectionEnabled: this.includeTime,
+        is12HourClock: this.is12HourClock,
+        // Back-compat: if someone is still setting clock-format, preserve behaviour.
         clockFormat: this.clockFormat
       });
       // Re-apply to ensure attribute/value formatting matches the current mode.
@@ -197,16 +199,29 @@ export class CircularCalendarElement extends HTMLElement {
     else this.removeAttribute('include-time');
   }
 
+  get is12HourClock() {
+    // Boolean attribute (preferred): present => true, absent => false,
+    // but allow explicit "false"/"0" values.
+    if (!this.hasAttribute('is12HourClock')) return false;
+    return parseBooleanAttributeValue(this.getAttribute('is12HourClock'));
+  }
+
+  set is12HourClock(next) {
+    const enabled = Boolean(next);
+    if (enabled) this.setAttribute('is12HourClock', '');
+    else this.removeAttribute('is12HourClock');
+  }
+
+  // Backwards compatible alias (deprecated): previously called `clockFormat` and driven by `clock-format`.
   get clockFormat() {
-    // New API: boolean. true => 12h, false => 24h.
+    if (this.hasAttribute('is12HourClock')) return this.is12HourClock;
     if (!this.hasAttribute('clock-format')) return false;
     return parseBooleanAttributeValue(this.getAttribute('clock-format'));
   }
 
   set clockFormat(next) {
-    const enabled = Boolean(next);
-    if (enabled) this.setAttribute('clock-format', '');
-    else this.removeAttribute('clock-format');
+    // Prefer setting the new attribute.
+    this.is12HourClock = Boolean(next);
   }
 
   get value() {
