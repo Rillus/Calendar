@@ -42,6 +42,8 @@ export function createCalendarRenderer(svgElement) {
   let radius = (svgSize / 2) - sunDistance - padding;
   let currentYear = new Date().getFullYear();
   let moonClipIdCounter = 0;
+  let activeView = 'year';
+  let activeMonthIndex = null;
 
   const notifyDateChanged = (date) => {
     const safeDate = createSafeDateCopy(date);
@@ -52,6 +54,25 @@ export function createCalendarRenderer(svgElement) {
         console.error('Date change listener failed', err);
       }
     }
+  };
+
+  const removeIfPresent = (selector) => {
+    const el = svg.querySelector(selector);
+    if (el) el.remove();
+  };
+
+  const removeAllIfPresent = (selector) => {
+    const els = svg.querySelectorAll(selector);
+    els.forEach((el) => el.remove());
+  };
+
+  const clearDaySelectionView = () => {
+    removeIfPresent('.day-segments-group');
+  };
+
+  const clearYearView = () => {
+    removeIfPresent('.segments-group');
+    hideSunAndMoon();
   };
 
   const subscribeToDateChanges = (listener) => {
@@ -67,6 +88,11 @@ export function createCalendarRenderer(svgElement) {
   };
 
   const drawCalendar = () => {
+    // Switching back to year view clears any day selection overlay.
+    clearDaySelectionView();
+    activeView = 'year';
+    activeMonthIndex = null;
+
     const segmentsGroup = svg.querySelector('.segments-group');
     if (segmentsGroup) {
       segmentsGroup.remove();
@@ -123,6 +149,12 @@ export function createCalendarRenderer(svgElement) {
         e.target.setAttribute('fill', newColourHex);
       });
 
+      path.addEventListener('click', (e) => {
+        e.preventDefault();
+        // Month tap/click switches to day selection view for that month.
+        showMonthDaySelection(i);
+      });
+
       segmentsGroupEl.appendChild(path);
 
       const labelAngle = -degreesToRadians(sumTo(data, i)) + degreesToRadians(45) + (arcSize / 2);
@@ -159,6 +191,111 @@ export function createCalendarRenderer(svgElement) {
     }
 
     svg.appendChild(segmentsGroupEl);
+  };
+
+  const showMonthCentre = (monthIndex) => {
+    const monthColourHex = rgbToHex(monthColors[monthIndex]);
+
+    removeIfPresent('.center-circle');
+    removeAllIfPresent('.center-text');
+
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    const innerRadius = radius / 3;
+    circle.setAttribute('cx', centerX);
+    circle.setAttribute('cy', centerY);
+    circle.setAttribute('r', innerRadius);
+    circle.setAttribute('fill', monthColourHex);
+    circle.setAttribute('class', 'center-circle');
+    svg.appendChild(circle);
+
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', centerX);
+    text.setAttribute('y', centerY);
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('dominant-baseline', 'middle');
+    text.setAttribute('class', 'center-text');
+    text.textContent = months[monthIndex];
+    text.style.fontSize = '16px';
+    text.style.fontFamily = 'Helvetica, Arial, sans-serif';
+    text.style.fontWeight = 'bold';
+    text.style.fill = '#fff';
+    svg.appendChild(text);
+  };
+
+  const showMonthDaySelection = (monthIndex) => {
+    clearYearView();
+    clearDaySelectionView();
+
+    activeView = 'monthDays';
+    activeMonthIndex = monthIndex;
+
+    const days = getDaysInMonth(monthIndex, currentYear);
+    const monthColourHex = rgbToHex(monthColors[monthIndex]);
+    const dayLabelColour = (monthIndex >= 3 && monthIndex <= 9) ? '#000' : '#fff';
+
+    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('class', 'day-segments-group');
+    group.setAttribute('data-month-index', String(monthIndex));
+
+    const degreesPerDay = 360 / days;
+    for (let i = 0; i < days; i++) {
+      const day = i + 1;
+      const startingAngle = -degreesToRadians(degreesPerDay * i) + degreesToRadians(45);
+      const arcSize = degreesToRadians(degreesPerDay);
+      const endingAngle = startingAngle + arcSize;
+
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', createArcPath(centerX, centerY, radius, startingAngle, endingAngle, fullRadius));
+      path.setAttribute('fill', monthColourHex);
+      path.setAttribute('stroke', '#fff');
+      path.setAttribute('stroke-width', '1');
+      path.setAttribute('class', 'day-segment');
+      path.setAttribute('data-day', String(day));
+      path.style.cursor = 'pointer';
+
+      path.addEventListener('click', (e) => {
+        e.preventDefault();
+        const selected = new Date(currentYear, monthIndex, day);
+        drawCalendar();
+        drawCircle();
+        selectDate(selected);
+      });
+
+      group.appendChild(path);
+
+      // Day number labels around the outside, similar to month labels.
+      const labelAngle = startingAngle + (arcSize / 2);
+      const labelRadius = radius * fullRadius * 0.95;
+      const labelPos = polarToCartesian(centerX, centerY, labelRadius, labelAngle);
+
+      let textRotation = (labelAngle * 180 / Math.PI) + 90;
+      if (labelAngle > Math.PI / 2 && labelAngle < 3 * Math.PI / 2) {
+        textRotation += 180;
+      }
+
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', labelPos[0]);
+      text.setAttribute('y', labelPos[1]);
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('dominant-baseline', 'middle');
+      text.setAttribute('transform', `rotate(${textRotation} ${labelPos[0]} ${labelPos[1]})`);
+      text.setAttribute('class', 'day-label');
+      text.setAttribute('data-day', String(day));
+      text.textContent = String(day);
+      text.style.fontSize = `${svgSize / 40}px`;
+      text.style.fontFamily = 'Helvetica, Arial, sans-serif';
+      text.style.fontWeight = 'bold';
+      text.style.pointerEvents = 'none';
+      text.style.fill = dayLabelColour;
+      if (dayLabelColour === '#fff') {
+        text.style.filter = 'drop-shadow(0px 0px 5px rgba(255, 255, 255, 0.2))';
+      }
+
+      group.appendChild(text);
+    }
+
+    svg.appendChild(group);
+    showMonthCentre(monthIndex);
   };
 
   const drawCircle = () => {
@@ -541,6 +678,12 @@ export function createCalendarRenderer(svgElement) {
   const selectDate = (date) => {
     const safeDate = createSafeDateCopy(date);
     const monthIndex = safeDate.getMonth();
+
+    // If we're in a day selection view, restore the year view before selecting.
+    if (activeView === 'monthDays') {
+      clearDaySelectionView();
+      drawCalendar();
+    }
 
     showSunAndMoonForDate(safeDate);
     writeSegmentName(labels[monthIndex] ?? months[monthIndex], safeDate);

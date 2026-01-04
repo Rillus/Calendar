@@ -289,5 +289,68 @@ describe('calendarRenderer', () => {
       expect(last.getDate()).toBe(10);
     });
   });
+
+  describe('month -> day selection view', () => {
+    beforeEach(() => {
+      initRenderer(mockSvg);
+      drawCalendar();
+    });
+
+    it('should swap to a day ring for the selected month and show the month name in the centre', () => {
+      const janPath = mockSvg.querySelector('.segments-group path[data-segment-index="0"]');
+      expect(janPath).not.toBeNull();
+
+      janPath.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+      const yearSegments = mockSvg.querySelector('.segments-group');
+      expect(yearSegments).toBeNull();
+
+      const dayGroup = mockSvg.querySelector('.day-segments-group');
+      expect(dayGroup).not.toBeNull();
+
+      const dayPaths = dayGroup.querySelectorAll('path.day-segment');
+      expect(dayPaths.length).toBe(31);
+
+      const dayLabels = dayGroup.querySelectorAll('text.day-label');
+      expect(dayLabels.length).toBe(31);
+      expect(Array.from(dayLabels).some((el) => el.textContent === '1')).toBe(true);
+      expect(Array.from(dayLabels).some((el) => el.textContent === '31')).toBe(true);
+
+      const centreTexts = Array.from(mockSvg.querySelectorAll('.center-text')).map((el) => el.textContent);
+      expect(centreTexts).toEqual(['JAN']);
+    });
+
+    it('should select the full date when a day is selected and restore the year view', () => {
+      const seen = [];
+      const unsubscribe = subscribeToDateChanges((date) => {
+        seen.push(date);
+      });
+
+      // Force deterministic year for the selection.
+      setYear(2026);
+      seen.length = 0;
+
+      const janPath = mockSvg.querySelector('.segments-group path[data-segment-index="0"]');
+      janPath.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+      const day15 = mockSvg.querySelector('.day-segments-group path.day-segment[data-day="15"]');
+      expect(day15).not.toBeNull();
+
+      day15.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+      unsubscribe();
+
+      const yearSegments = mockSvg.querySelector('.segments-group');
+      expect(yearSegments).not.toBeNull();
+      expect(mockSvg.querySelector('.day-segments-group')).toBeNull();
+      expect(mockSvg.querySelector('.sun-icon')).not.toBeNull();
+
+      expect(seen.length).toBeGreaterThanOrEqual(1);
+      const last = seen[seen.length - 1];
+      expect(last.getFullYear()).toBe(2026);
+      expect(last.getMonth()).toBe(0);
+      expect(last.getDate()).toBe(15);
+    });
+  });
 });
 
