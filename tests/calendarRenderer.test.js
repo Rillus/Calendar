@@ -407,5 +407,58 @@ describe('calendarRenderer', () => {
       expect(sunTransformAfter).toBe(sunTransformBefore);
     });
   });
+
+  describe('year (month) ring dragging', () => {
+    beforeEach(() => {
+      initRenderer(mockSvg);
+      // Drag handlers rely on viewBox for coordinate transforms.
+      mockSvg.setAttribute('viewBox', `0 0 ${svgSize} ${svgSize}`);
+      drawCalendar();
+    });
+
+    it('should allow dragging the year ring to change the selected date while the sun remains static', () => {
+      // Make SVG coordinate transforms deterministic in jsdom.
+      mockSvg.getBoundingClientRect = () => ({
+        left: 0,
+        top: 0,
+        width: svgSize,
+        height: svgSize,
+        right: svgSize,
+        bottom: svgSize,
+        x: 0,
+        y: 0,
+        toJSON() { return {}; }
+      });
+
+      setYear(2026);
+      selectDate(new Date(2026, 0, 15));
+
+      const seen = [];
+      const unsubscribe = subscribeToDateChanges((date) => seen.push(date));
+      seen.length = 0;
+
+      const sun = mockSvg.querySelector('.sun-icon');
+      expect(sun).not.toBeNull();
+      const sunTransformBefore = sun.getAttribute('transform');
+
+      const segmentsGroup = mockSvg.querySelector('.segments-group');
+      expect(segmentsGroup).not.toBeNull();
+
+      const centre = svgSize / 2;
+      segmentsGroup.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: centre + 100, clientY: centre }));
+      document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: centre, clientY: centre + 100 }));
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+
+      unsubscribe();
+
+      expect(seen.length).toBeGreaterThanOrEqual(1);
+      const last = seen[seen.length - 1];
+      expect(last.getFullYear()).toBe(2026);
+      expect(last.getMonth()).not.toBe(0);
+
+      const sunTransformAfter = mockSvg.querySelector('.sun-icon')?.getAttribute('transform');
+      expect(sunTransformAfter).toBe(sunTransformBefore);
+    });
+  });
 });
 
