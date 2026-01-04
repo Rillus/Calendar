@@ -427,6 +427,8 @@ export function createCalendarRenderer(svgElement) {
     let startRotation = 0;
     let didDrag = false;
     let suppressNextClick = false;
+    let isDragActive = false;
+    const dragThresholdRadians = 0.04; // ~2.3 degrees
 
     const ensureSunAngle = () => {
       if (Number.isFinite(currentSunAngle)) return;
@@ -453,17 +455,22 @@ export function createCalendarRenderer(svgElement) {
     segmentsGroup.addEventListener('mousedown', (e) => {
       isPointerDown = true;
       didDrag = false;
+      isDragActive = false;
       startPointerAngle = getAngleFromEvent(e);
       startRotation = yearRingRotation;
-      segmentsGroup.style.cursor = 'grabbing';
-      e.preventDefault();
+      // Don't preventDefault here: it can interfere with click/tap month selection.
     });
 
     const handleMouseMove = (e) => {
       if (!isPointerDown) return;
       const angle = getAngleFromEvent(e);
       const delta = normaliseDeltaRadians(angle - startPointerAngle);
-      if (Math.abs(delta) > 0.02) didDrag = true;
+      if (!isDragActive) {
+        if (Math.abs(delta) < dragThresholdRadians) return;
+        isDragActive = true;
+        segmentsGroup.style.cursor = 'grabbing';
+      }
+      didDrag = true;
       applyRotation(startRotation + delta);
       e.preventDefault();
     };
@@ -481,16 +488,22 @@ export function createCalendarRenderer(svgElement) {
     segmentsGroup.addEventListener('touchstart', (e) => {
       isPointerDown = true;
       didDrag = false;
+      isDragActive = false;
       startPointerAngle = getAngleFromEvent(e);
       startRotation = yearRingRotation;
-      e.preventDefault();
+      // Don't preventDefault here: it can suppress the synthetic click on tap.
     }, { passive: false });
 
     document.addEventListener('touchmove', (e) => {
       if (!isPointerDown) return;
       const angle = getAngleFromEvent(e);
       const delta = normaliseDeltaRadians(angle - startPointerAngle);
-      if (Math.abs(delta) > 0.02) didDrag = true;
+      if (!isDragActive) {
+        if (Math.abs(delta) < dragThresholdRadians) return;
+        isDragActive = true;
+        segmentsGroup.style.cursor = 'grabbing';
+      }
+      didDrag = true;
       applyRotation(startRotation + delta);
       e.preventDefault();
     }, { passive: false });
