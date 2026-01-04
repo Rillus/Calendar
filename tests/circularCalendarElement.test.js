@@ -44,5 +44,30 @@ describe('circular-calendar web component', () => {
     expect(el.value).toBe('2026-01-10');
     expect(seen).toEqual(['input', 'change']);
   });
+
+  it('should default to date-only value formatting when include-time is not set', () => {
+    const el = document.createElement('circular-calendar');
+    el.setAttribute('value', '2026-01-15T13:25');
+    document.body.appendChild(el);
+
+    // Date-only mode should ignore time in string inputs.
+    expect(el.value).toBe('2026-01-15');
+  });
+
+  it('should submit a local datetime value when include-time is true', () => {
+    const form = document.createElement('form');
+    const el = document.createElement('circular-calendar');
+    el.setAttribute('name', 'selectedDateTime');
+    el.setAttribute('include-time', '');
+    el.setAttribute('value', '2026-01-15T13:25');
+
+    form.appendChild(el);
+    document.body.appendChild(form);
+
+    expect(el.value).toBe('2026-01-15T13:25');
+
+    const fd = new FormData(form);
+    expect(fd.get('selectedDateTime')).toBe('2026-01-15T13:25');
+  });
 });
 

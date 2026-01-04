@@ -352,5 +352,76 @@ describe('calendarRenderer', () => {
       expect(last.getDate()).toBe(15);
     });
   });
+
+  describe('time selection view (optional)', () => {
+    beforeEach(() => {
+      initRenderer(mockSvg, { timeSelectionEnabled: true, clockFormat: 24 });
+      drawCalendar();
+      setYear(2026);
+    });
+
+    it('should show an hour ring after selecting a day (and not notify until minutes are selected)', () => {
+      const seen = [];
+      const unsubscribe = subscribeToDateChanges((date) => seen.push(date));
+
+      const janPath = mockSvg.querySelector('.segments-group path[data-segment-index="0"]');
+      expect(janPath).not.toBeNull();
+      janPath.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+      const day15 = mockSvg.querySelector('.day-segments-group path.day-segment[data-day="15"]');
+      expect(day15).not.toBeNull();
+      day15.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+      // Day view should be replaced by hour selection.
+      expect(mockSvg.querySelector('.day-segments-group')).toBeNull();
+      const hourGroup = mockSvg.querySelector('.hour-segments-group');
+      expect(hourGroup).not.toBeNull();
+
+      const hourSegments = hourGroup.querySelectorAll('path.hour-segment');
+      expect(hourSegments.length).toBe(24);
+
+      // No notification yet (time not locked in).
+      expect(seen.length).toBe(0);
+      unsubscribe();
+    });
+
+    it('should show a minute ring after selecting an hour, then notify and return to year view after selecting minutes', () => {
+      const seen = [];
+      const unsubscribe = subscribeToDateChanges((date) => seen.push(date));
+
+      const janPath = mockSvg.querySelector('.segments-group path[data-segment-index="0"]');
+      janPath.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      const day15 = mockSvg.querySelector('.day-segments-group path.day-segment[data-day="15"]');
+      day15.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+      const hour13 = mockSvg.querySelector('.hour-segments-group path.hour-segment[data-hour="13"]');
+      expect(hour13).not.toBeNull();
+      hour13.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+      const minuteGroup = mockSvg.querySelector('.minute-segments-group');
+      expect(minuteGroup).not.toBeNull();
+      const minuteSegments = minuteGroup.querySelectorAll('path.minute-segment');
+      expect(minuteSegments.length).toBe(12);
+
+      const minute25 = mockSvg.querySelector('.minute-segments-group path.minute-segment[data-minute="25"]');
+      expect(minute25).not.toBeNull();
+      minute25.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+      // After minutes are selected, return to year view and notify once.
+      expect(mockSvg.querySelector('.segments-group')).not.toBeNull();
+      expect(mockSvg.querySelector('.hour-segments-group')).toBeNull();
+      expect(mockSvg.querySelector('.minute-segments-group')).toBeNull();
+
+      expect(seen.length).toBe(1);
+      const last = seen[0];
+      expect(last.getFullYear()).toBe(2026);
+      expect(last.getMonth()).toBe(0);
+      expect(last.getDate()).toBe(15);
+      expect(last.getHours()).toBe(13);
+      expect(last.getMinutes()).toBe(25);
+
+      unsubscribe();
+    });
+  });
 });
 
