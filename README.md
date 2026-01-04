@@ -168,6 +168,24 @@ The project ships a standalone custom element: `<circular-calendar>`.
 - **Selected date input**: set/read via the `value` attribute/property (`YYYY-MM-DD`)
 - **Form submission**: set `name` and the selected date will be included in `FormData`
 
+## Production build (minified bundle)
+
+To use the web component in production without ES module imports, you can generate a single minified bundle:
+
+```bash
+npm run build
+```
+
+This outputs `dist/circular-calendar.min.js` (gitignored). When loaded, it **auto-defines** the `<circular-calendar>` element.
+This outputs `dist/circular-calendar.min.js` (committed). When loaded, it **auto-defines** the `<circular-calendar>` element.
+
+Example:
+
+```html
+<circular-calendar name="selectedDate" value="2026-01-15"></circular-calendar>
+<script src="./dist/circular-calendar.min.js"></script>
+```
+
 Example:
 
 ```html
