@@ -311,6 +311,11 @@ describe('calendarRenderer', () => {
       const dayPaths = dayGroup.querySelectorAll('path.day-segment');
       expect(dayPaths.length).toBe(31);
 
+      const dayLabels = dayGroup.querySelectorAll('text.day-label');
+      expect(dayLabels.length).toBe(31);
+      expect(Array.from(dayLabels).some((el) => el.textContent === '1')).toBe(true);
+      expect(Array.from(dayLabels).some((el) => el.textContent === '31')).toBe(true);
+
       const centreTexts = Array.from(mockSvg.querySelectorAll('.center-text')).map((el) => el.textContent);
       expect(centreTexts).toEqual(['JAN']);
     });

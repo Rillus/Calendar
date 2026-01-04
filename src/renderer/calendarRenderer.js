@@ -231,6 +231,7 @@ export function createCalendarRenderer(svgElement) {
 
     const days = getDaysInMonth(monthIndex, currentYear);
     const monthColourHex = rgbToHex(monthColors[monthIndex]);
+    const dayLabelColour = (monthIndex >= 3 && monthIndex <= 9) ? '#000' : '#fff';
 
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     group.setAttribute('class', 'day-segments-group');
@@ -261,6 +262,36 @@ export function createCalendarRenderer(svgElement) {
       });
 
       group.appendChild(path);
+
+      // Day number labels around the outside, similar to month labels.
+      const labelAngle = startingAngle + (arcSize / 2);
+      const labelRadius = radius * fullRadius * 0.95;
+      const labelPos = polarToCartesian(centerX, centerY, labelRadius, labelAngle);
+
+      let textRotation = (labelAngle * 180 / Math.PI) + 90;
+      if (labelAngle > Math.PI / 2 && labelAngle < 3 * Math.PI / 2) {
+        textRotation += 180;
+      }
+
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', labelPos[0]);
+      text.setAttribute('y', labelPos[1]);
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('dominant-baseline', 'middle');
+      text.setAttribute('transform', `rotate(${textRotation} ${labelPos[0]} ${labelPos[1]})`);
+      text.setAttribute('class', 'day-label');
+      text.setAttribute('data-day', String(day));
+      text.textContent = String(day);
+      text.style.fontSize = `${svgSize / 40}px`;
+      text.style.fontFamily = 'Helvetica, Arial, sans-serif';
+      text.style.fontWeight = 'bold';
+      text.style.pointerEvents = 'none';
+      text.style.fill = dayLabelColour;
+      if (dayLabelColour === '#fff') {
+        text.style.filter = 'drop-shadow(0px 0px 5px rgba(255, 255, 255, 0.2))';
+      }
+
+      group.appendChild(text);
     }
 
     svg.appendChild(group);
