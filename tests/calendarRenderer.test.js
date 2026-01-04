@@ -406,6 +406,60 @@ describe('calendarRenderer', () => {
       const sunTransformAfter = mockSvg.querySelector('.sun-icon')?.getAttribute('transform');
       expect(sunTransformAfter).toBe(sunTransformBefore);
     });
+
+    it('should not select a day on the first click after dragging the day ring (but should on the next click)', () => {
+      // Make SVG coordinate transforms deterministic in jsdom.
+      mockSvg.getBoundingClientRect = () => ({
+        left: 0,
+        top: 0,
+        width: svgSize,
+        height: svgSize,
+        right: svgSize,
+        bottom: svgSize,
+        x: 0,
+        y: 0,
+        toJSON() { return {}; }
+      });
+
+      setYear(2026);
+      selectDate(new Date(2026, 0, 10));
+
+      const seen = [];
+      const unsubscribe = subscribeToDateChanges((date) => seen.push(date));
+      seen.length = 0;
+
+      const janPath = mockSvg.querySelector('.segments-group path[data-segment-index="0"]');
+      janPath.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+      const dayGroup = mockSvg.querySelector('.day-segments-group');
+      expect(dayGroup).not.toBeNull();
+
+      const centre = svgSize / 2;
+      dayGroup.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: centre + 100, clientY: centre }));
+      document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: centre, clientY: centre + 100 }));
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+
+      const day15 = mockSvg.querySelector('.day-segments-group path.day-segment[data-day="15"]');
+      expect(day15).not.toBeNull();
+
+      // First click after drag should be suppressed (remain in day selection view).
+      day15.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(mockSvg.querySelector('.day-segments-group')).not.toBeNull();
+      expect(mockSvg.querySelector('.segments-group')).toBeNull();
+
+      // Next click should select the day and return to the year view.
+      day15.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(mockSvg.querySelector('.day-segments-group')).toBeNull();
+      expect(mockSvg.querySelector('.segments-group')).not.toBeNull();
+
+      unsubscribe();
+
+      expect(seen.length).toBeGreaterThanOrEqual(1);
+      const last = seen[seen.length - 1];
+      expect(last.getFullYear()).toBe(2026);
+      expect(last.getMonth()).toBe(0);
+      expect(last.getDate()).toBe(15);
+    });
   });
 
   describe('year (month) ring dragging', () => {
@@ -458,6 +512,44 @@ describe('calendarRenderer', () => {
 
       const sunTransformAfter = mockSvg.querySelector('.sun-icon')?.getAttribute('transform');
       expect(sunTransformAfter).toBe(sunTransformBefore);
+    });
+
+    it('should not trigger month selection on the first click after a drag (but should on the next click)', () => {
+      mockSvg.getBoundingClientRect = () => ({
+        left: 0,
+        top: 0,
+        width: svgSize,
+        height: svgSize,
+        right: svgSize,
+        bottom: svgSize,
+        x: 0,
+        y: 0,
+        toJSON() { return {}; }
+      });
+
+      setYear(2026);
+      selectDate(new Date(2026, 0, 15));
+
+      const segmentsGroup = mockSvg.querySelector('.segments-group');
+      expect(segmentsGroup).not.toBeNull();
+
+      const centre = svgSize / 2;
+      segmentsGroup.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: centre + 100, clientY: centre }));
+      document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: centre, clientY: centre + 100 }));
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+
+      const febPath = mockSvg.querySelector('.segments-group path[data-segment-index="1"]');
+      expect(febPath).not.toBeNull();
+
+      // First click after drag should be suppressed (stay in year view).
+      febPath.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(mockSvg.querySelector('.segments-group')).not.toBeNull();
+      expect(mockSvg.querySelector('.day-segments-group')).toBeNull();
+
+      // Next click should work normally (enter day selection view).
+      febPath.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(mockSvg.querySelector('.segments-group')).toBeNull();
+      expect(mockSvg.querySelector('.day-segments-group')).not.toBeNull();
     });
   });
 });
