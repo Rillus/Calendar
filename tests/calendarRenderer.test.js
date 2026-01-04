@@ -355,7 +355,7 @@ describe('calendarRenderer', () => {
 
   describe('time selection view (optional)', () => {
     beforeEach(() => {
-      initRenderer(mockSvg, { timeSelectionEnabled: true, clockFormat: 24 });
+      initRenderer(mockSvg, { timeSelectionEnabled: true, clockFormat: false });
       drawCalendar();
       setYear(2026);
     });

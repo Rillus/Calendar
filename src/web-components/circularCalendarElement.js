@@ -41,7 +41,17 @@ const toIsoDateTime = (date) => {
   return `${base}T${hh}:${mm}`;
 };
 
-const normaliseClockFormat = (value) => (String(value) === '12' ? 12 : 24);
+const parseBooleanAttributeValue = (value) => {
+  // Boolean attribute semantics: present => true, unless explicitly "false"/"0".
+  if (value == null) return true;
+  const raw = String(value).trim().toLowerCase();
+  if (raw === '' || raw === 'true' || raw === '1') return true;
+  if (raw === 'false' || raw === '0') return false;
+  // Back-compat for old "12"/"24" clock-format values.
+  if (raw === '12') return true;
+  if (raw === '24') return false;
+  return true;
+};
 
 export class CircularCalendarElement extends HTMLElement {
   static observedAttributes = ['value', 'name', 'include-time', 'clock-format'];
@@ -188,11 +198,15 @@ export class CircularCalendarElement extends HTMLElement {
   }
 
   get clockFormat() {
-    return normaliseClockFormat(this.getAttribute('clock-format'));
+    // New API: boolean. true => 12h, false => 24h.
+    if (!this.hasAttribute('clock-format')) return false;
+    return parseBooleanAttributeValue(this.getAttribute('clock-format'));
   }
 
   set clockFormat(next) {
-    this.setAttribute('clock-format', String(normaliseClockFormat(next)));
+    const enabled = Boolean(next);
+    if (enabled) this.setAttribute('clock-format', '');
+    else this.removeAttribute('clock-format');
   }
 
   get value() {

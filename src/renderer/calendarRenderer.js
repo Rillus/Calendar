@@ -24,7 +24,17 @@ import { getDaysInMonth } from '../utils/dateUtils.js';
 import { getMoonPhase, getMoonPhaseAngle, getMoonPhaseName } from '../utils/moonPhase.js';
 
 const createSafeDateCopy = (date) => new Date(date.getTime());
-const normaliseClockFormat = (value) => (String(value) === '12' ? 12 : 24);
+const normaliseTwelveHourClock = (value) => {
+  // New API: boolean (true => 12h, false => 24h)
+  if (typeof value === 'boolean') return value;
+
+  // Back-compat for previous string/number usage
+  const raw = String(value ?? '').trim().toLowerCase();
+  if (raw === '') return false;
+  if (raw === '12' || raw === 'true' || raw === '1') return true;
+  if (raw === '24' || raw === 'false' || raw === '0') return false;
+  return false;
+};
 
 export function createCalendarRenderer(svgElement, options = {}) {
   if (!svgElement) {
@@ -46,7 +56,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
   let activeView = 'year';
   let activeMonthIndex = null;
   let timeSelectionEnabled = Boolean(options.timeSelectionEnabled);
-  let clockFormat = normaliseClockFormat(options.clockFormat);
+  let useTwelveHourClock = normaliseTwelveHourClock(options.clockFormat);
   let pendingDate = null;
   let pendingMeridiem = 'AM'; // only used in 12h mode
   let pendingHour24 = 0;
@@ -363,13 +373,13 @@ export function createCalendarRenderer(svgElement, options = {}) {
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     group.setAttribute('class', 'hour-segments-group');
 
-    const count = clockFormat === 12 ? 12 : 24;
+    const count = useTwelveHourClock ? 12 : 24;
     const degreesPer = 360 / count;
     const outerRadiusRatio = 0.78;
     const innerRadius = radius * 0.52;
 
     for (let i = 0; i < count; i++) {
-      const displayHour = clockFormat === 12 ? (i + 1) : i;
+      const displayHour = useTwelveHourClock ? (i + 1) : i;
       const startingAngle = -degreesToRadians(degreesPer * i) + degreesToRadians(45);
       const arcSize = degreesToRadians(degreesPer);
       const endingAngle = startingAngle + arcSize;
@@ -395,7 +405,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
         const hourValue = Number(path.getAttribute('data-hour'));
         if (!Number.isFinite(hourValue)) return;
 
-        if (clockFormat === 12) {
+        if (useTwelveHourClock) {
           const hour12 = hourValue === 12 ? 0 : hourValue;
           pendingHour24 = pendingMeridiem === 'PM' ? (hour12 + 12) : hour12;
         } else {
@@ -434,7 +444,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
 
     svg.appendChild(group);
 
-    if (clockFormat === 12) {
+    if (useTwelveHourClock) {
       renderAmPmSelector();
     }
   };
@@ -927,7 +937,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
 
   const setTimeSelectionOptions = (next = {}) => {
     timeSelectionEnabled = Boolean(next.timeSelectionEnabled);
-    clockFormat = normaliseClockFormat(next.clockFormat);
+    useTwelveHourClock = normaliseTwelveHourClock(next.clockFormat);
     // If options change mid-flow, reset any in-progress selection overlays.
     pendingDate = null;
     clearTimeSelectionView();
