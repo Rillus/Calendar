@@ -49,6 +49,9 @@ export function createCalendarRenderer(svgElement, options = {}) {
   let centerY = svgSize / 2;
   let radius = (svgSize / 2) - sunDistance - padding;
   let currentYear = new Date().getFullYear();
+  let currentSelectedDate = new Date(currentYear, 0, 1);
+  let currentSunAngle = null;
+  let yearRingRotation = 0;
   let moonClipIdCounter = 0;
   let activeView = 'year';
   let activeMonthIndex = null;
@@ -58,8 +61,106 @@ export function createCalendarRenderer(svgElement, options = {}) {
   let pendingMeridiem = 'AM'; // only used in 12h mode
   let pendingHour24 = 0;
 
+  const getEventPos = (e) => {
+    if (e.touches && e.touches.length > 0) {
+      return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+    return { x: e.clientX, y: e.clientY };
+  };
+
+  const normaliseRadians = (angle) => {
+    let a = angle;
+    while (a < 0) a += 2 * Math.PI;
+    while (a >= 2 * Math.PI) a -= 2 * Math.PI;
+    return a;
+  };
+
+  const normaliseDeltaRadians = (delta) => {
+    let d = delta;
+    while (d <= -Math.PI) d += 2 * Math.PI;
+    while (d > Math.PI) d -= 2 * Math.PI;
+    return d;
+  };
+
+  const getMonthDayForAngleInYear = (angle) => {
+    // Angle is in "year ring space" (i.e. after undoing any year ring rotation).
+    const segmentStartAngles = [];
+    for (let i = 0; i < segments; i++) {
+      const startAngle = -degreesToRadians(sumTo(data, i)) + degreesToRadians(45);
+      segmentStartAngles.push({ month: i, angle: normaliseRadians(startAngle) });
+    }
+
+    let monthIndex = 0;
+    let angleInSegment = 0;
+
+    for (let i = 0; i < segmentStartAngles.length; i++) {
+      const currentStart = segmentStartAngles[i].angle;
+      let segmentEnd = currentStart + degreesToRadians(deg);
+      if (segmentEnd > 2 * Math.PI) segmentEnd -= 2 * Math.PI;
+
+      const inSegment = currentStart < segmentEnd
+        ? angle >= currentStart && angle < segmentEnd
+        : angle >= currentStart || angle < segmentEnd;
+
+      if (inSegment) {
+        monthIndex = segmentStartAngles[i].month;
+        angleInSegment = angle - currentStart;
+        if (angleInSegment < 0) angleInSegment += 2 * Math.PI;
+        break;
+      }
+    }
+
+    const segmentSize = degreesToRadians(deg);
+    angleInSegment = Math.max(0, Math.min(angleInSegment, segmentSize));
+    const positionInSegment = 1 - (angleInSegment / segmentSize);
+    const daysInMonth = getDaysInMonth(monthIndex, currentYear);
+    const dayInMonth = Math.max(1, Math.min(daysInMonth, Math.floor(positionInSegment * daysInMonth) + 1));
+
+    return { monthIndex, dayInMonth };
+  };
+
+  const updateMoonForDateWithFixedSun = (date) => {
+    const sunAngle = Number.isFinite(currentSunAngle) ? currentSunAngle : degreesToRadians(45);
+    const moonGroup = svg.querySelector('.moon-icon');
+    if (!moonGroup) return;
+
+    const moonPhase = getMoonPhase(date);
+    const moonPhaseAngle = getMoonPhaseAngle(date);
+    const moonAngle = sunAngle - moonPhaseAngle;
+    const moonRadius = radius + moonDistance;
+    const moonPos = polarToCartesian(centerX, centerY, moonRadius, moonAngle);
+
+    moonGroup.setAttribute('transform', `translate(${moonPos[0]}, ${moonPos[1]})`);
+
+    const moonIconRadius = 6;
+    const shadowDx = getMoonShadowDx(moonIconRadius, moonPhase);
+    const shadow = moonGroup.querySelector?.('.moon-icon__shadow');
+    if (shadow) shadow.setAttribute('cx', String(shadowDx));
+  };
+
+  const getAngleFromEvent = (e) => {
+    const svgRect = svg.getBoundingClientRect();
+    const pos = getEventPos(e);
+    const mouseX = pos.x - svgRect.left;
+    const mouseY = pos.y - svgRect.top;
+
+    const viewBox = svg.viewBox?.baseVal;
+    const vbWidth = viewBox?.width || svgSize;
+    const vbHeight = viewBox?.height || svgSize;
+    const svgWidth = svgRect.width || vbWidth;
+    const svgHeight = svgRect.height || vbHeight;
+
+    const mouseSvgX = (mouseX / svgWidth) * vbWidth;
+    const mouseSvgY = (mouseY / svgHeight) * vbHeight;
+
+    const dx = mouseSvgX - centerX;
+    const dy = mouseSvgY - centerY;
+    return normaliseRadians(Math.atan2(dy, dx));
+  };
+
   const notifyDateChanged = (date) => {
     const safeDate = createSafeDateCopy(date);
+    currentSelectedDate = safeDate;
     for (const listener of dateChangeListeners) {
       try {
         listener(safeDate);
@@ -91,7 +192,6 @@ export function createCalendarRenderer(svgElement, options = {}) {
 
   const clearYearView = () => {
     removeIfPresent('.segments-group');
-    hideSunAndMoon();
   };
 
   const subscribeToDateChanges = (listener) => {
@@ -210,7 +310,15 @@ export function createCalendarRenderer(svgElement, options = {}) {
       segmentsGroupEl.appendChild(text);
     }
 
+    if (Number.isFinite(yearRingRotation) && yearRingRotation !== 0) {
+      const rotationDeg = (yearRingRotation * 180) / Math.PI;
+      segmentsGroupEl.setAttribute('transform', `rotate(${rotationDeg} ${centerX} ${centerY})`);
+    }
+
     svg.appendChild(segmentsGroupEl);
+
+    // Enable dragging of the year ring (month segments).
+    setupYearRingDragHandlers(segmentsGroupEl);
   };
 
   const showMonthCentre = (monthIndex) => {
@@ -240,6 +348,233 @@ export function createCalendarRenderer(svgElement, options = {}) {
     text.style.fontWeight = 'bold';
     text.style.fill = '#fff';
     svg.appendChild(text);
+  };
+
+  const showMonthCentreForDate = (monthIndex, date) => {
+    showMonthCentre(monthIndex);
+    if (!(date instanceof Date)) return;
+    const centreText = svg.querySelector('.center-text');
+    if (!centreText) return;
+    centreText.textContent = `${months[monthIndex]} ${date.getDate()}`;
+  };
+
+  const getDayForAngleInMonth = (angle, days) => {
+    const degreesPerDay = 2 * Math.PI / days;
+    for (let i = 0; i < days; i++) {
+      const start = normaliseRadians(-degreesPerDay * i + degreesToRadians(45));
+      let end = start + degreesPerDay;
+      if (end >= 2 * Math.PI) end -= 2 * Math.PI;
+
+      const inSegment = start < end ? (angle >= start && angle < end) : (angle >= start || angle < end);
+      if (inSegment) return i + 1;
+    }
+    return 1;
+  };
+
+  const setupMonthDayRingDragHandlers = (dayGroup, monthIndex, days) => {
+    let isDragging = false;
+    let isDragActive = false;
+    let didDrag = false;
+    let suppressNextClick = false;
+    let startPointerAngle = 0;
+    let startRotation = 0;
+    let rotation = 0;
+    const dragThresholdRadians = 0.04; // ~2.3 degrees
+
+    const applyRotation = (nextRotation) => {
+      rotation = nextRotation;
+      const rotationDeg = rotation * 180 / Math.PI;
+      dayGroup.setAttribute('transform', `rotate(${rotationDeg} ${centerX} ${centerY})`);
+
+      const sunAngle = Number.isFinite(currentSunAngle) ? currentSunAngle : degreesToRadians(45);
+      const adjustedAngle = normaliseRadians(sunAngle - rotation);
+      const day = getDayForAngleInMonth(adjustedAngle, days);
+      const date = new Date(currentYear, monthIndex, day);
+      showMonthCentreForDate(monthIndex, date);
+      notifyDateChanged(date);
+    };
+
+    dayGroup.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      isDragActive = false;
+      didDrag = false;
+      startPointerAngle = getAngleFromEvent(e);
+      startRotation = rotation;
+      // Don't preventDefault here: it can interfere with click selection on day segments.
+    });
+
+    const handleMouseMove = (e) => {
+      if (!isDragging) return;
+      const angle = getAngleFromEvent(e);
+      const delta = normaliseDeltaRadians(angle - startPointerAngle);
+      if (!isDragActive) {
+        if (Math.abs(delta) < dragThresholdRadians) return;
+        isDragActive = true;
+        didDrag = true;
+        dayGroup.style.cursor = 'grabbing';
+      } else {
+        didDrag = true;
+      }
+      applyRotation(startRotation + delta);
+      e.preventDefault();
+    };
+
+    const handleMouseUp = () => {
+      if (!isDragging) return;
+      isDragging = false;
+      dayGroup.style.cursor = 'grab';
+      if (didDrag) suppressNextClick = true;
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    dayGroup.addEventListener('touchstart', (e) => {
+      isDragging = true;
+      isDragActive = false;
+      didDrag = false;
+      startPointerAngle = getAngleFromEvent(e);
+      startRotation = rotation;
+      // Don't preventDefault here: it can suppress the synthetic click on tap.
+    }, { passive: false });
+
+    document.addEventListener('touchmove', (e) => {
+      if (!isDragging) return;
+      const angle = getAngleFromEvent(e);
+      const delta = normaliseDeltaRadians(angle - startPointerAngle);
+      if (!isDragActive) {
+        if (Math.abs(delta) < dragThresholdRadians) return;
+        isDragActive = true;
+        didDrag = true;
+        dayGroup.style.cursor = 'grabbing';
+      } else {
+        didDrag = true;
+      }
+      applyRotation(startRotation + delta);
+      e.preventDefault();
+    }, { passive: false });
+
+    document.addEventListener('touchend', () => {
+      if (!isDragging) return;
+      isDragging = false;
+      if (didDrag) suppressNextClick = true;
+    }, { passive: true });
+
+    // If the user dragged the ring, suppress the next click so it doesn't "pick a day" accidentally.
+    dayGroup.addEventListener('click', (e) => {
+      if (!suppressNextClick) return;
+      suppressNextClick = false;
+      e.preventDefault();
+      e.stopPropagation();
+    }, { capture: true });
+
+    dayGroup.style.cursor = 'grab';
+    dayGroup.style.pointerEvents = 'all';
+  };
+
+  const setupYearRingDragHandlers = (segmentsGroup) => {
+    if (!segmentsGroup) return;
+    let isPointerDown = false;
+    let startPointerAngle = 0;
+    let startRotation = 0;
+    let didDrag = false;
+    let suppressNextClick = false;
+    let isDragActive = false;
+    const dragThresholdRadians = 0.04; // ~2.3 degrees
+
+    const ensureSunAngle = () => {
+      if (Number.isFinite(currentSunAngle)) return;
+      // Ensure we have a sun position available for date alignment.
+      showSunAndMoonForDate(currentSelectedDate);
+    };
+
+    const applyRotation = (nextRotation) => {
+      yearRingRotation = nextRotation;
+      const rotationDeg = (yearRingRotation * 180) / Math.PI;
+      segmentsGroup.setAttribute('transform', `rotate(${rotationDeg} ${centerX} ${centerY})`);
+
+      ensureSunAngle();
+      const sunAngle = Number.isFinite(currentSunAngle) ? currentSunAngle : degreesToRadians(45);
+      const adjustedAngle = normaliseRadians(sunAngle - yearRingRotation);
+      const { monthIndex, dayInMonth } = getMonthDayForAngleInYear(adjustedAngle);
+
+      const date = new Date(currentYear, monthIndex, dayInMonth);
+      writeSegmentName(labels[monthIndex] ?? months[monthIndex], date);
+      notifyDateChanged(date);
+      updateMoonForDateWithFixedSun(date);
+    };
+
+    segmentsGroup.addEventListener('mousedown', (e) => {
+      isPointerDown = true;
+      didDrag = false;
+      isDragActive = false;
+      startPointerAngle = getAngleFromEvent(e);
+      startRotation = yearRingRotation;
+      // Don't preventDefault here: it can interfere with click/tap month selection.
+    });
+
+    const handleMouseMove = (e) => {
+      if (!isPointerDown) return;
+      const angle = getAngleFromEvent(e);
+      const delta = normaliseDeltaRadians(angle - startPointerAngle);
+      if (!isDragActive) {
+        if (Math.abs(delta) < dragThresholdRadians) return;
+        isDragActive = true;
+        segmentsGroup.style.cursor = 'grabbing';
+      }
+      didDrag = true;
+      applyRotation(startRotation + delta);
+      e.preventDefault();
+    };
+
+    const handleMouseUp = () => {
+      if (!isPointerDown) return;
+      isPointerDown = false;
+      segmentsGroup.style.cursor = 'grab';
+      if (didDrag) suppressNextClick = true;
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    segmentsGroup.addEventListener('touchstart', (e) => {
+      isPointerDown = true;
+      didDrag = false;
+      isDragActive = false;
+      startPointerAngle = getAngleFromEvent(e);
+      startRotation = yearRingRotation;
+      // Don't preventDefault here: it can suppress the synthetic click on tap.
+    }, { passive: false });
+
+    document.addEventListener('touchmove', (e) => {
+      if (!isPointerDown) return;
+      const angle = getAngleFromEvent(e);
+      const delta = normaliseDeltaRadians(angle - startPointerAngle);
+      if (!isDragActive) {
+        if (Math.abs(delta) < dragThresholdRadians) return;
+        isDragActive = true;
+        segmentsGroup.style.cursor = 'grabbing';
+      }
+      didDrag = true;
+      applyRotation(startRotation + delta);
+      e.preventDefault();
+    }, { passive: false });
+
+    document.addEventListener('touchend', () => {
+      if (!isPointerDown) return;
+      isPointerDown = false;
+      if (didDrag) suppressNextClick = true;
+    }, { passive: true });
+
+    segmentsGroup.addEventListener('click', (e) => {
+      if (!suppressNextClick) return;
+      suppressNextClick = false;
+      e.preventDefault();
+      e.stopPropagation();
+    }, { capture: true });
+
+    segmentsGroup.style.cursor = 'grab';
+    segmentsGroup.style.pointerEvents = 'all';
   };
 
   const showMonthDaySelection = (monthIndex) => {
@@ -326,6 +661,27 @@ export function createCalendarRenderer(svgElement, options = {}) {
 
     svg.appendChild(group);
     showMonthCentre(monthIndex);
+
+    // Keep the sun visible but static while dragging the month ring.
+    const moon = svg.querySelector('.moon-icon');
+    if (moon) moon.remove();
+
+    const sun = svg.querySelector('.sun-icon');
+    if (!sun) {
+      // Ensure we have a sun position available for date alignment.
+      showSunAndMoonForDate(currentSelectedDate);
+      const createdMoon = svg.querySelector('.moon-icon');
+      if (createdMoon) createdMoon.remove();
+    }
+
+    const sunAfter = svg.querySelector('.sun-icon');
+    if (sunAfter) {
+      sunAfter.style.cursor = 'default';
+      sunAfter.style.pointerEvents = 'none';
+      sunAfter.removeAttribute('data-draggable');
+    }
+
+    setupMonthDayRingDragHandlers(group, monthIndex, days);
   };
 
   const renderAmPmSelector = () => {
@@ -650,38 +1006,9 @@ export function createCalendarRenderer(svgElement, options = {}) {
   const setupSunDragHandlers = (sunGroup) => {
     let isDragging = false;
 
-    const getEventPos = (e) => {
-      if (e.touches && e.touches.length > 0) {
-        return { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      }
-      return { x: e.clientX, y: e.clientY };
-    };
-
-    const getAngleFromEvent = (e) => {
-      const svgRect = svg.getBoundingClientRect();
-      const pos = getEventPos(e);
-      const mouseX = pos.x - svgRect.left;
-      const mouseY = pos.y - svgRect.top;
-
-      const viewBox = svg.viewBox.baseVal;
-      const svgWidth = svgRect.width;
-      const svgHeight = svgRect.height;
-
-      const mouseSvgX = (mouseX / svgWidth) * viewBox.width;
-      const mouseSvgY = (mouseY / svgHeight) * viewBox.height;
-
-      const dx = mouseSvgX - centerX;
-      const dy = mouseSvgY - centerY;
-      let angle = Math.atan2(dy, dx);
-
-      if (angle < 0) {
-        angle += 2 * Math.PI;
-      }
-
-      return angle;
-    };
-
     const updateSunPosition = (angle) => {
+      currentSunAngle = normaliseRadians(angle);
+      const angleForMapping = normaliseRadians(currentSunAngle - yearRingRotation);
       const segmentStartAngles = [];
       for (let i = 0; i < segments; i++) {
         const startAngle = -degreesToRadians(sumTo(data, i)) + degreesToRadians(45);
@@ -703,14 +1030,14 @@ export function createCalendarRenderer(svgElement, options = {}) {
 
         let inSegment = false;
         if (currentStart < segmentEnd) {
-          inSegment = angle >= currentStart && angle < segmentEnd;
+          inSegment = angleForMapping >= currentStart && angleForMapping < segmentEnd;
         } else {
-          inSegment = angle >= currentStart || angle < segmentEnd;
+          inSegment = angleForMapping >= currentStart || angleForMapping < segmentEnd;
         }
 
         if (inSegment) {
           monthIndex = segmentStartAngles[i].month;
-          angleInSegment = angle - currentStart;
+          angleInSegment = angleForMapping - currentStart;
           if (angleInSegment < 0) {
             angleInSegment += 2 * Math.PI;
           }
@@ -729,11 +1056,11 @@ export function createCalendarRenderer(svgElement, options = {}) {
       notifyDateChanged(date);
 
       const sunRadius = radius + sunDistance;
-      const sunPos = polarToCartesian(centerX, centerY, sunRadius, angle);
+      const sunPos = polarToCartesian(centerX, centerY, sunRadius, currentSunAngle);
 
       const moonPhaseAngle = getMoonPhaseAngle(date);
       const moonPhase = getMoonPhase(date);
-      const moonAngle = angle - moonPhaseAngle;
+      const moonAngle = currentSunAngle - moonPhaseAngle;
       const moonRadius = radius + moonDistance;
       const moonPos = polarToCartesian(centerX, centerY, moonRadius, moonAngle);
 
@@ -902,15 +1229,15 @@ export function createCalendarRenderer(svgElement, options = {}) {
     const angleForDate = segmentStartAngle + angleInSegment;
 
     let normalizedAngle = angleForDate;
-    while (normalizedAngle < 0) normalizedAngle += 2 * Math.PI;
-    while (normalizedAngle >= 2 * Math.PI) normalizedAngle -= 2 * Math.PI;
+    normalizedAngle = normaliseRadians(normalizedAngle);
+    currentSunAngle = normaliseRadians(normalizedAngle + yearRingRotation);
 
     const sunRadius = radius + sunDistance;
-    const sunPos = polarToCartesian(centerX, centerY, sunRadius, normalizedAngle);
+    const sunPos = polarToCartesian(centerX, centerY, sunRadius, currentSunAngle);
 
     const moonPhase = getMoonPhase(date);
     const moonPhaseAngle = getMoonPhaseAngle(date);
-    const moonAngle = normalizedAngle - moonPhaseAngle;
+    const moonAngle = currentSunAngle - moonPhaseAngle;
     const moonRadius = radius + moonDistance;
     const moonPos = polarToCartesian(centerX, centerY, moonRadius, moonAngle);
 
@@ -920,6 +1247,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
   const selectDate = (date) => {
     const safeDate = createSafeDateCopy(date);
     const monthIndex = safeDate.getMonth();
+    currentSelectedDate = safeDate;
 
     // If we're in a day selection view, restore the year view before selecting.
     if (activeView === 'monthDays') {
@@ -944,11 +1272,13 @@ export function createCalendarRenderer(svgElement, options = {}) {
     currentYear = year;
     const today = new Date();
     if (year === today.getFullYear()) {
+      currentSelectedDate = createSafeDateCopy(today);
       showSunAndMoonForDate(today);
       writeSegmentName(labels[today.getMonth()], today);
       notifyDateChanged(today);
     } else {
       const midYearDate = new Date(year, 5, 15);
+      currentSelectedDate = createSafeDateCopy(midYearDate);
       showSunAndMoonForDate(midYearDate);
       writeSegmentName(labels[midYearDate.getMonth()], midYearDate);
       notifyDateChanged(midYearDate);
