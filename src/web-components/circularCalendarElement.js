@@ -1,14 +1,30 @@
 import { svgSize } from '../config/config.js';
 import { createCalendarRenderer } from '../renderer/calendarRenderer.js';
 
-const parseIsoDate = (value) => {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value));
-  if (!match) return null;
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
-  return new Date(year, month - 1, day);
+const parseIsoValue = (value) => {
+  const raw = String(value);
+  const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  if (dateMatch) {
+    const year = Number(dateMatch[1]);
+    const month = Number(dateMatch[2]);
+    const day = Number(dateMatch[3]);
+    if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
+    return new Date(year, month - 1, day, 0, 0, 0, 0);
+  }
+
+  const dateTimeMatch = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})$/.exec(raw);
+  if (!dateTimeMatch) return null;
+  const year = Number(dateTimeMatch[1]);
+  const month = Number(dateTimeMatch[2]);
+  const day = Number(dateTimeMatch[3]);
+  const hour = Number(dateTimeMatch[4]);
+  const minute = Number(dateTimeMatch[5]);
+  if (![year, month, day, hour, minute].every(Number.isFinite)) return null;
+  if (month < 1 || month > 12) return null;
+  if (day < 1 || day > 31) return null;
+  if (hour < 0 || hour > 23) return null;
+  if (minute < 0 || minute > 59) return null;
+  return new Date(year, month - 1, day, hour, minute, 0, 0);
 };
 
 const toIsoDate = (date) => {
@@ -18,8 +34,24 @@ const toIsoDate = (date) => {
   return `${y}-${m}-${d}`;
 };
 
+const toIsoDateTime = (date) => {
+  const base = toIsoDate(date);
+  const hh = String(date.getHours()).padStart(2, '0');
+  const mm = String(date.getMinutes()).padStart(2, '0');
+  return `${base}T${hh}:${mm}`;
+};
+
+const parseBooleanAttributeValue = (value) => {
+  // Boolean attribute semantics: present => true, unless explicitly "false"/"0".
+  if (value == null) return true;
+  const raw = String(value).trim().toLowerCase();
+  if (raw === '' || raw === 'true' || raw === '1') return true;
+  if (raw === 'false' || raw === '0') return false;
+  return true;
+};
+
 export class CircularCalendarElement extends HTMLElement {
-  static observedAttributes = ['value', 'name'];
+  static observedAttributes = ['value', 'name', 'include-time', 'is12hourclock'];
 
   constructor() {
     super();
@@ -81,11 +113,14 @@ export class CircularCalendarElement extends HTMLElement {
       this.appendChild(this._proxyInput);
     }
 
-    this._renderer = createCalendarRenderer(this._svg);
+    this._renderer = createCalendarRenderer(this._svg, {
+      timeSelectionEnabled: this.includeTime,
+      is12HourClock: this.is12HourClock
+    });
     this._renderer.drawCalendar();
     this._renderer.drawCircle();
 
-    const initial = parseIsoDate(this.getAttribute('value')) ?? new Date();
+    const initial = parseIsoValue(this.getAttribute('value')) ?? new Date();
     this._applyDate(initial, { emit: false, updateRenderer: true });
 
     this._unsubscribe = this._renderer.subscribeToDateChanges((date) => {
@@ -95,15 +130,21 @@ export class CircularCalendarElement extends HTMLElement {
     });
 
     this._dateInput.addEventListener('input', () => {
-      const date = parseIsoDate(this._dateInput.value);
-      if (!date) return;
+      const parsed = parseIsoValue(this._dateInput.value);
+      if (!parsed) return;
+      const hours = this.includeTime && this._selectedDate ? this._selectedDate.getHours() : 0;
+      const minutes = this.includeTime && this._selectedDate ? this._selectedDate.getMinutes() : 0;
+      const date = new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate(), hours, minutes, 0, 0);
       // Native input event is already composed and bubbles to the host.
       this._applyDate(date, { emit: false, updateRenderer: true });
     });
 
     this._dateInput.addEventListener('change', () => {
-      const date = parseIsoDate(this._dateInput.value);
-      if (!date) return;
+      const parsed = parseIsoValue(this._dateInput.value);
+      if (!parsed) return;
+      const hours = this.includeTime && this._selectedDate ? this._selectedDate.getHours() : 0;
+      const minutes = this.includeTime && this._selectedDate ? this._selectedDate.getMinutes() : 0;
+      const date = new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate(), hours, minutes, 0, 0);
       // Native change event is already composed and bubbles to the host.
       this._applyDate(date, { emit: false, updateRenderer: true });
     });
@@ -123,20 +164,56 @@ export class CircularCalendarElement extends HTMLElement {
       return;
     }
 
+    if (name === 'include-time' || name === 'is12hourclock') {
+      this._renderer?.setTimeSelectionOptions?.({
+        timeSelectionEnabled: this.includeTime,
+        is12HourClock: this.is12HourClock
+      });
+      // Re-apply to ensure attribute/value formatting matches the current mode.
+      if (this._selectedDate) {
+        this._applyDate(this._selectedDate, { emit: false, updateRenderer: true });
+      }
+      return;
+    }
+
     if (name === 'value') {
       if (this._isApplyingExternalValue) return;
-      const date = parseIsoDate(newValue);
+      const date = parseIsoValue(newValue);
       if (!date) return;
       this._applyDate(date, { emit: false, updateRenderer: true });
     }
   }
 
+  get includeTime() {
+    return this.hasAttribute('include-time');
+  }
+
+  set includeTime(next) {
+    const enabled = Boolean(next);
+    if (enabled) this.setAttribute('include-time', '');
+    else this.removeAttribute('include-time');
+  }
+
+  get is12HourClock() {
+    // Boolean attribute (preferred): present => true, absent => false,
+    // but allow explicit "false"/"0" values.
+    if (!this.hasAttribute('is12HourClock')) return false;
+    return parseBooleanAttributeValue(this.getAttribute('is12HourClock'));
+  }
+
+  set is12HourClock(next) {
+    const enabled = Boolean(next);
+    if (enabled) this.setAttribute('is12HourClock', '');
+    else this.removeAttribute('is12HourClock');
+  }
+
   get value() {
-    return this._selectedDate ? toIsoDate(this._selectedDate) : '';
+    if (!this._selectedDate) return '';
+    return this.includeTime ? toIsoDateTime(this._selectedDate) : toIsoDate(this._selectedDate);
   }
 
   set value(next) {
-    const date = parseIsoDate(next);
+    const date = parseIsoValue(next);
     if (!date) return;
     this._applyDate(date, { emit: false, updateRenderer: true });
   }
@@ -163,8 +240,10 @@ export class CircularCalendarElement extends HTMLElement {
   }
 
   _applyDate(date, { emit, updateRenderer }) {
-    const safeDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    const iso = toIsoDate(safeDate);
+    const hours = this.includeTime ? date.getHours() : 0;
+    const minutes = this.includeTime ? date.getMinutes() : 0;
+    const safeDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hours, minutes, 0, 0);
+    const iso = this.includeTime ? toIsoDateTime(safeDate) : toIsoDate(safeDate);
 
     if (this.value === iso) {
       if (emit === 'input') {
@@ -187,7 +266,7 @@ export class CircularCalendarElement extends HTMLElement {
     }
 
     this._selectedDate = safeDate;
-    this._dateInput.value = iso;
+    this._dateInput.value = toIsoDate(safeDate);
 
     this._syncProxyName();
     this._syncProxyValue();

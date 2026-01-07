@@ -24,8 +24,16 @@ import { getDaysInMonth } from '../utils/dateUtils.js';
 import { getMoonPhase, getMoonPhaseAngle, getMoonPhaseName } from '../utils/moonPhase.js';
 
 const createSafeDateCopy = (date) => new Date(date.getTime());
+const normaliseTwelveHourClock = (value) => {
+  if (typeof value === 'boolean') return value;
 
-export function createCalendarRenderer(svgElement) {
+  const raw = String(value ?? '').trim().toLowerCase();
+  if (raw === '' || raw === 'false' || raw === '0') return false;
+  if (raw === 'true' || raw === '1') return true;
+  return false;
+};
+
+export function createCalendarRenderer(svgElement, options = {}) {
   if (!svgElement) {
     throw new Error('SVG element is required');
   }
@@ -44,6 +52,11 @@ export function createCalendarRenderer(svgElement) {
   let moonClipIdCounter = 0;
   let activeView = 'year';
   let activeMonthIndex = null;
+  let timeSelectionEnabled = Boolean(options.timeSelectionEnabled);
+  let useTwelveHourClock = normaliseTwelveHourClock(options.is12HourClock);
+  let pendingDate = null;
+  let pendingMeridiem = 'AM'; // only used in 12h mode
+  let pendingHour24 = 0;
 
   const notifyDateChanged = (date) => {
     const safeDate = createSafeDateCopy(date);
@@ -70,6 +83,12 @@ export function createCalendarRenderer(svgElement) {
     removeIfPresent('.day-segments-group');
   };
 
+  const clearTimeSelectionView = () => {
+    removeIfPresent('.hour-segments-group');
+    removeIfPresent('.minute-segments-group');
+    removeIfPresent('.ampm-selector-group');
+  };
+
   const clearYearView = () => {
     removeIfPresent('.segments-group');
     hideSunAndMoon();
@@ -90,6 +109,7 @@ export function createCalendarRenderer(svgElement) {
   const drawCalendar = () => {
     // Switching back to year view clears any day selection overlay.
     clearDaySelectionView();
+    clearTimeSelectionView();
     activeView = 'year';
     activeMonthIndex = null;
 
@@ -225,6 +245,7 @@ export function createCalendarRenderer(svgElement) {
   const showMonthDaySelection = (monthIndex) => {
     clearYearView();
     clearDaySelectionView();
+    clearTimeSelectionView();
 
     activeView = 'monthDays';
     activeMonthIndex = monthIndex;
@@ -256,6 +277,15 @@ export function createCalendarRenderer(svgElement) {
       path.addEventListener('click', (e) => {
         e.preventDefault();
         const selected = new Date(currentYear, monthIndex, day);
+        if (timeSelectionEnabled) {
+          pendingDate = selected;
+          pendingMeridiem = 'AM';
+          pendingHour24 = 0;
+          clearDaySelectionView();
+          showHourSelection();
+          return;
+        }
+
         drawCalendar();
         drawCircle();
         selectDate(selected);
@@ -296,6 +326,218 @@ export function createCalendarRenderer(svgElement) {
 
     svg.appendChild(group);
     showMonthCentre(monthIndex);
+  };
+
+  const renderAmPmSelector = () => {
+    removeIfPresent('.ampm-selector-group');
+
+    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('class', 'ampm-selector-group');
+
+    const makeLabel = (label, xOffset) => {
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', String(centerX + xOffset));
+      text.setAttribute('y', String(centerY + 32));
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('dominant-baseline', 'middle');
+      text.setAttribute('class', 'ampm-selector');
+      text.setAttribute('data-meridiem', label);
+      text.textContent = label;
+      text.style.fontFamily = 'Helvetica, Arial, sans-serif';
+      text.style.fontSize = '12px';
+      text.style.cursor = 'pointer';
+      const selected = pendingMeridiem === label;
+      text.style.fontWeight = selected ? 'bold' : 'normal';
+      text.style.fill = selected ? '#111' : '#666';
+
+      text.addEventListener('click', (e) => {
+        e.preventDefault();
+        pendingMeridiem = label;
+        renderAmPmSelector();
+      });
+      return text;
+    };
+
+    group.appendChild(makeLabel('AM', -18));
+    group.appendChild(makeLabel('PM', 18));
+    svg.appendChild(group);
+  };
+
+  const showHourSelection = () => {
+    clearTimeSelectionView();
+    activeView = 'hours';
+
+    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('class', 'hour-segments-group');
+
+    const count = useTwelveHourClock ? 12 : 24;
+    const degreesPer = 360 / count;
+    const outerRadiusRatio = 0.78;
+    const innerRadius = radius * 0.52;
+
+    for (let i = 0; i < count; i++) {
+      const displayHour = useTwelveHourClock ? (i + 1) : i;
+      const startingAngle = -degreesToRadians(degreesPer * i) + degreesToRadians(45);
+      const arcSize = degreesToRadians(degreesPer);
+      const endingAngle = startingAngle + arcSize;
+
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', createArcPath(centerX, centerY, radius, startingAngle, endingAngle, outerRadiusRatio, innerRadius));
+      path.setAttribute('fill', '#f7f7f7');
+      path.setAttribute('stroke', '#ddd');
+      path.setAttribute('stroke-width', '1');
+      path.setAttribute('class', 'hour-segment');
+      path.setAttribute('data-hour', String(displayHour));
+      path.style.cursor = 'pointer';
+
+      path.addEventListener('mouseenter', (e) => {
+        e.target.setAttribute('fill', '#eee');
+      });
+      path.addEventListener('mouseleave', (e) => {
+        e.target.setAttribute('fill', '#f7f7f7');
+      });
+
+      path.addEventListener('click', (e) => {
+        e.preventDefault();
+        const hourValue = Number(path.getAttribute('data-hour'));
+        if (!Number.isFinite(hourValue)) return;
+
+        if (useTwelveHourClock) {
+          const hour12 = hourValue === 12 ? 0 : hourValue;
+          pendingHour24 = pendingMeridiem === 'PM' ? (hour12 + 12) : hour12;
+        } else {
+          pendingHour24 = Math.max(0, Math.min(23, hourValue));
+        }
+
+        showMinuteSelection();
+      });
+
+      group.appendChild(path);
+
+      const labelAngle = startingAngle + (arcSize / 2);
+      const labelRadius = radius * outerRadiusRatio * 0.90;
+      const labelPos = polarToCartesian(centerX, centerY, labelRadius, labelAngle);
+
+      let textRotation = (labelAngle * 180 / Math.PI) + 90;
+      if (labelAngle > Math.PI / 2 && labelAngle < 3 * Math.PI / 2) {
+        textRotation += 180;
+      }
+
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', labelPos[0]);
+      text.setAttribute('y', labelPos[1]);
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('dominant-baseline', 'middle');
+      text.setAttribute('transform', `rotate(${textRotation} ${labelPos[0]} ${labelPos[1]})`);
+      text.setAttribute('class', 'hour-label');
+      text.textContent = String(displayHour).padStart(2, '0');
+      text.style.fontSize = `${svgSize / 55}px`;
+      text.style.fontFamily = 'Helvetica, Arial, sans-serif';
+      text.style.fontWeight = 'bold';
+      text.style.pointerEvents = 'none';
+      text.style.fill = '#333';
+      group.appendChild(text);
+    }
+
+    svg.appendChild(group);
+
+    if (useTwelveHourClock) {
+      renderAmPmSelector();
+    }
+  };
+
+  const showMinuteSelection = () => {
+    removeIfPresent('.minute-segments-group');
+    activeView = 'minutes';
+
+    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('class', 'minute-segments-group');
+
+    const minutes = Array.from({ length: 12 }, (_, i) => i * 5);
+    const count = minutes.length;
+    const degreesPer = 360 / count;
+    const outerRadiusRatio = 0.62;
+    const innerRadius = radius * 0.34;
+
+    for (let i = 0; i < count; i++) {
+      const minute = minutes[i];
+      const startingAngle = -degreesToRadians(degreesPer * i) + degreesToRadians(45);
+      const arcSize = degreesToRadians(degreesPer);
+      const endingAngle = startingAngle + arcSize;
+
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', createArcPath(centerX, centerY, radius, startingAngle, endingAngle, outerRadiusRatio, innerRadius));
+      path.setAttribute('fill', '#ffffff');
+      path.setAttribute('stroke', '#ddd');
+      path.setAttribute('stroke-width', '1');
+      path.setAttribute('class', 'minute-segment');
+      path.setAttribute('data-minute', String(minute));
+      path.style.cursor = 'pointer';
+
+      path.addEventListener('mouseenter', (e) => {
+        e.target.setAttribute('fill', '#f1f1f1');
+      });
+      path.addEventListener('mouseleave', (e) => {
+        e.target.setAttribute('fill', '#ffffff');
+      });
+
+      path.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (!pendingDate) return;
+        const minuteValue = Number(path.getAttribute('data-minute'));
+        if (!Number.isFinite(minuteValue)) return;
+
+        const final = new Date(
+          pendingDate.getFullYear(),
+          pendingDate.getMonth(),
+          pendingDate.getDate(),
+          pendingHour24,
+          minuteValue,
+          0,
+          0
+        );
+
+        pendingDate = null;
+        clearTimeSelectionView();
+        drawCalendar();
+        drawCircle();
+        selectDate(final);
+      });
+
+      group.appendChild(path);
+
+      const labelAngle = startingAngle + (arcSize / 2);
+      const labelRadius = radius * outerRadiusRatio * 0.92;
+      const labelPos = polarToCartesian(centerX, centerY, labelRadius, labelAngle);
+
+      let textRotation = (labelAngle * 180 / Math.PI) + 90;
+      if (labelAngle > Math.PI / 2 && labelAngle < 3 * Math.PI / 2) {
+        textRotation += 180;
+      }
+
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', labelPos[0]);
+      text.setAttribute('y', labelPos[1]);
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('dominant-baseline', 'middle');
+      text.setAttribute('transform', `rotate(${textRotation} ${labelPos[0]} ${labelPos[1]})`);
+      text.setAttribute('class', 'minute-label');
+      text.textContent = String(minute);
+
+      const base = svgSize / 70;
+      const fontSize =
+        minute === 0 || minute === 30 ? base * 1.8
+          : (minute === 15 || minute === 45 ? base * 1.35 : base);
+
+      text.style.fontSize = `${fontSize}px`;
+      text.style.fontFamily = 'Helvetica, Arial, sans-serif';
+      text.style.fontWeight = minute === 0 || minute === 30 ? 'bold' : 'normal';
+      text.style.pointerEvents = 'none';
+      text.style.fill = '#333';
+      group.appendChild(text);
+    }
+
+    svg.appendChild(group);
   };
 
   const drawCircle = () => {
@@ -690,6 +932,14 @@ export function createCalendarRenderer(svgElement) {
     notifyDateChanged(safeDate);
   };
 
+  const setTimeSelectionOptions = (next = {}) => {
+    timeSelectionEnabled = Boolean(next.timeSelectionEnabled);
+    useTwelveHourClock = normaliseTwelveHourClock(next.is12HourClock);
+    // If options change mid-flow, reset any in-progress selection overlays.
+    pendingDate = null;
+    clearTimeSelectionView();
+  };
+
   const setYear = (year) => {
     currentYear = year;
     const today = new Date();
@@ -714,6 +964,7 @@ export function createCalendarRenderer(svgElement) {
     drawCircle,
     writeSegmentName,
     setYear,
+    setTimeSelectionOptions,
     showSunAndMoonForDate,
     selectDate,
     subscribeToDateChanges
@@ -729,8 +980,8 @@ const requireDefaultRenderer = () => {
   return defaultRenderer;
 };
 
-export function initRenderer(svgElement) {
-  defaultRenderer = createCalendarRenderer(svgElement);
+export function initRenderer(svgElement, options = {}) {
+  defaultRenderer = createCalendarRenderer(svgElement, options);
 }
 
 export function drawCalendar() {
@@ -759,5 +1010,9 @@ export function selectDate(date) {
 
 export function subscribeToDateChanges(listener) {
   return requireDefaultRenderer().subscribeToDateChanges(listener);
+}
+
+export function setTimeSelectionOptions(options = {}) {
+  return requireDefaultRenderer().setTimeSelectionOptions(options);
 }
 

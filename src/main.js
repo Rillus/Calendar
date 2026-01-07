@@ -3,12 +3,14 @@
 /********/
 
 import { svgSize } from './config/config.js';
-import { initRenderer, drawCalendar, drawCircle, setYear, showSunAndMoonForDate, subscribeToDateChanges, selectDate } from './renderer/calendarRenderer.js';
+import { initRenderer, drawCalendar, drawCircle, setYear, showSunAndMoonForDate, subscribeToDateChanges, selectDate, setTimeSelectionOptions } from './renderer/calendarRenderer.js';
 import { renderMonthView } from './renderer/monthViewRenderer.js';
 
 function init() {
     const svg = document.getElementById("calendar-svg");
     const yearInput = document.getElementById("year-input");
+    const includeTimeToggle = document.getElementById('toggle-include-time');
+    const is12HourToggle = document.getElementById('toggle-12-hour');
     const monthViewContainer = document.getElementById("month-view-container");
     
     if (!svg) {
@@ -27,7 +29,10 @@ function init() {
     }
     
     // Initialize renderer
-    initRenderer(svg);
+    initRenderer(svg, {
+        timeSelectionEnabled: Boolean(includeTimeToggle?.checked),
+        is12HourClock: Boolean(is12HourToggle?.checked)
+    });
     
     // Set fixed viewBox - this defines the coordinate system
     svg.setAttribute("viewBox", `0 0 ${svgSize} ${svgSize}`);
@@ -86,6 +91,16 @@ function init() {
             }
         }
     });
+
+    const syncTimeSelectionOptions = () => {
+        setTimeSelectionOptions({
+            timeSelectionEnabled: Boolean(includeTimeToggle?.checked),
+            is12HourClock: Boolean(is12HourToggle?.checked)
+        });
+    };
+
+    includeTimeToggle?.addEventListener('change', syncTimeSelectionOptions);
+    is12HourToggle?.addEventListener('change', syncTimeSelectionOptions);
     
     // Handle window resize - only update if needed
     let resizeTimeout;
