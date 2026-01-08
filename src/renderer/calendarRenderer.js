@@ -372,8 +372,8 @@ export function createCalendarRenderer(svgElement, options = {}) {
 
     const count = useTwelveHourClock ? 12 : 24;
     const degreesPer = 360 / count;
-    const outerRadiusRatio = 0.78;
-    const innerRadius = radius * 0.52;
+    const outerRadiusRatio = 0.62;
+    const innerRadius = radius * 0.34;
 
     for (let i = 0; i < count; i++) {
       const displayHour = useTwelveHourClock ? (i + 1) : i;
@@ -456,8 +456,8 @@ export function createCalendarRenderer(svgElement, options = {}) {
     const minutes = Array.from({ length: 12 }, (_, i) => i * 5);
     const count = minutes.length;
     const degreesPer = 360 / count;
-    const outerRadiusRatio = 0.62;
-    const innerRadius = radius * 0.34;
+    const outerRadiusRatio = 0.78;
+    const innerRadius = radius * 0.52;
 
     for (let i = 0; i < count; i++) {
       const minute = minutes[i];
