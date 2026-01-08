@@ -4,8 +4,7 @@
 
 // Converts a single component to hex
 function componentToHex(c) {
-    const hex = c.toString(16);
-    return hex.length == 1 ? "0" + hex : hex;
+    return c.toString(16).padStart(2, '0');
 }
 
 // Converts RGB array to hex string
@@ -25,8 +24,8 @@ export function rgbToRgbString(colour) {
 export function colourSum(colour1, colour2, steps, thisStep) {
     return colour1.map((component1, index) => {
         const component2 = colour2[index];
-        const diff = (Math.max(component1, component2) - Math.min(component1, component2)) / steps;
-        const increment = component1 < component2 ? diff * thisStep : -diff * thisStep;
+        const diff = Math.abs(component2 - component1) / steps;
+        const increment = (component2 - component1) / steps * thisStep;
         return Math.round(component1 + increment);
     });
 }

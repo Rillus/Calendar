@@ -60,14 +60,22 @@ function init() {
     yearInput.value = currentYear;
     setYear(currentYear);
 
-    const handleMonthViewSelectDate = (date) => {
-        const year = date.getFullYear();
-        const currentYearValue = parseInt(yearInput.value, 10);
-        if (year !== currentYearValue) {
+    // Helper function to update year and redraw calendar
+    const updateYearAndRedraw = (year) => {
+        if (year !== currentYear) {
+            currentYear = year;
             yearInput.value = year;
             setYear(year);
             drawCalendar();
             drawCircle();
+        }
+    };
+
+    const handleMonthViewSelectDate = (date) => {
+        const year = date.getFullYear();
+        const currentYearValue = parseInt(yearInput.value, 10);
+        if (year !== currentYearValue) {
+            updateYearAndRedraw(year);
         }
 
         selectDate(date);
@@ -96,10 +104,7 @@ function init() {
     yearInput.addEventListener("input", (e) => {
         const year = parseInt(e.target.value, 10);
         if (!isNaN(year) && year >= 1900 && year <= 2100) {
-            currentYear = year; // Update tracked year
-            setYear(year);
-            drawCalendar();
-            drawCircle();
+            updateYearAndRedraw(year);
             // Show sun and moon for today if viewing current year
             const now = new Date();
             if (year === now.getFullYear()) {
@@ -142,7 +147,7 @@ function init() {
         }
         
         // Check for T key (case-insensitive)
-        if (e.key === 't' || e.key === 'T') {
+        if (e.key.toLowerCase() === 't') {
             e.preventDefault();
             handleGoToToday();
         }
@@ -152,16 +157,8 @@ function init() {
     let voiceRecognition = null;
     let isListening = false;
 
-    // Helper function to update year if needed
-    const updateYearIfNeeded = (year) => {
-        if (year !== currentYear) {
-            currentYear = year;
-            yearInput.value = year;
-            setYear(year);
-            drawCalendar();
-            drawCircle();
-        }
-    };
+    // Helper function to update year if needed (alias for consistency)
+    const updateYearIfNeeded = updateYearAndRedraw;
 
     const handleNextMonth = () => {
         const nextDate = new Date(currentSelectedDate);

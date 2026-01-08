@@ -19,17 +19,10 @@ export function getMoonPhase(date) {
     // Calculate days difference (can be negative if date is before reference)
     const daysDiff = (date.getTime() - referenceDate.getTime()) / (1000 * 60 * 60 * 24);
     
-    // Get phase in 0-1 range using modulo
-    // Handle negative values by adding synodicMonth before modulo
-    let phase = daysDiff % SYNODIC_MONTH_DAYS;
-    if (phase < 0) {
-        phase += SYNODIC_MONTH_DAYS;
-    }
+    // Normalize to 0-1 range using modulo, handling negative values
+    const phase = ((daysDiff % SYNODIC_MONTH_DAYS) + SYNODIC_MONTH_DAYS) % SYNODIC_MONTH_DAYS;
     
-    // Normalize to 0-1
-    const normalizedPhase = phase / SYNODIC_MONTH_DAYS;
-    
-    return normalizedPhase;
+    return phase / SYNODIC_MONTH_DAYS;
 }
 
 // Gets the angle (in radians) for moon position relative to sun
