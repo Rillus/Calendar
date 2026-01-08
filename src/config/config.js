@@ -56,4 +56,3 @@ export const svgSize = 400;
 export const sunDistance = 50; // Sun appears 50px outside calendar
 export const moonDistance = 20; // Moon appears 20px outside calendar
 export const padding = 10; // Padding from SVG edge
-
