@@ -322,7 +322,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
           outerRadiusRatio = notchedRadius30;
         }
 
-        const startingAngle = -degreesToRadians(sumTo(data, i)) + degreesToRadians(45);
+        const startingAngle = degreesToRadians(sumTo(data, i)) - degreesToRadians(90);
         const arcSize = degreesToRadians(data[i]);
         const endingAngle = startingAngle + arcSize;
 
@@ -400,7 +400,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
 
         segmentsGroupEl.appendChild(path);
 
-        const labelAngle = -degreesToRadians(sumTo(data, i)) + degreesToRadians(45) + (arcSize / 2);
+        const labelAngle = degreesToRadians(sumTo(data, i)) - degreesToRadians(90) + (arcSize / 2);
         const labelRadius = radius * outerRadiusRatio * 0.95;
         const labelPos = polarToCartesian(centerX, centerY, labelRadius, labelAngle);
 
@@ -525,7 +525,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
       const degreesPerDay = 360 / days;
       for (let i = 0; i < days; i++) {
         const day = i + 1;
-        const startingAngle = -degreesToRadians(degreesPerDay * i) + degreesToRadians(45);
+        const startingAngle = degreesToRadians(degreesPerDay * i) - degreesToRadians(90);
         const arcSize = degreesToRadians(degreesPerDay);
         const endingAngle = startingAngle + arcSize;
 
@@ -778,7 +778,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
         const dayMonthIndex = dayDate.getMonth();
         const dayYear = dayDate.getFullYear();
         
-        const startingAngle = -degreesToRadians(degreesPerDay * i) + degreesToRadians(45);
+        const startingAngle = degreesToRadians(degreesPerDay * i) - degreesToRadians(90);
         const arcSize = degreesToRadians(degreesPerDay);
         const endingAngle = startingAngle + arcSize;
 
@@ -1037,10 +1037,12 @@ export function createCalendarRenderer(svgElement, options = {}) {
       const degreesPer = 360 / count;
       const outerRadiusRatio = 0.62;
       const innerRadius = radius * 0.34;
+      // Offset to center hour at the top: 11.5 segments for 12-hour (hour 12), 0.5 for 24-hour (hour 0)
+      const offsetIndex = useTwelveHourClock ? 11.5 : 0.5;
 
       for (let i = 0; i < count; i++) {
       const displayHour = useTwelveHourClock ? (i + 1) : i;
-      const startingAngle = -degreesToRadians(degreesPer * i) + degreesToRadians(45);
+      const startingAngle = degreesToRadians(degreesPer * (i - offsetIndex)) - degreesToRadians(90);
       const arcSize = degreesToRadians(degreesPer);
       const endingAngle = startingAngle + arcSize;
 
@@ -1230,7 +1232,8 @@ export function createCalendarRenderer(svgElement, options = {}) {
 
       for (let i = 0; i < count; i++) {
       const minute = minutes[i];
-      const startingAngle = -degreesToRadians(degreesPer * i) + degreesToRadians(45);
+      // Offset to center minute 00 at the top: subtract 0.5 segments so center of first segment is at top
+      const startingAngle = degreesToRadians(degreesPer * (i - 0.5)) - degreesToRadians(90);
       const arcSize = degreesToRadians(degreesPer);
       const endingAngle = startingAngle + arcSize;
 
@@ -1548,7 +1551,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
     const updateSunPosition = (angle) => {
       const segmentStartAngles = [];
       for (let i = 0; i < segments; i++) {
-        const startAngle = -degreesToRadians(sumTo(data, i)) + degreesToRadians(45);
+        const startAngle = degreesToRadians(sumTo(data, i)) - degreesToRadians(90);
         let normalized = startAngle;
         while (normalized < 0) normalized += 2 * Math.PI;
         while (normalized >= 2 * Math.PI) normalized -= 2 * Math.PI;
@@ -1584,7 +1587,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
 
       const segmentSize = degreesToRadians(deg);
       angleInSegment = Math.max(0, Math.min(angleInSegment, segmentSize));
-      const positionInSegment = 1 - (angleInSegment / segmentSize);
+      const positionInSegment = angleInSegment / segmentSize;
       const daysInMonth = getDaysInMonth(monthIndex, currentYear);
       const dayInMonth = Math.max(1, Math.min(daysInMonth, Math.floor(positionInSegment * daysInMonth) + 1));
 
@@ -1757,11 +1760,11 @@ export function createCalendarRenderer(svgElement, options = {}) {
     const dayInMonth = date.getDate();
     const year = date.getFullYear();
 
-    const segmentStartAngle = -degreesToRadians(sumTo(data, monthIndex)) + degreesToRadians(45);
+    const segmentStartAngle = degreesToRadians(sumTo(data, monthIndex)) - degreesToRadians(90);
     const segmentSize = degreesToRadians(deg);
 
     const daysInMonth = getDaysInMonth(monthIndex, year);
-    const positionInSegment = 1 - ((dayInMonth - 1) / daysInMonth);
+    const positionInSegment = (dayInMonth - 1) / daysInMonth;
     const angleInSegment = positionInSegment * segmentSize;
     const angleForDate = segmentStartAngle + angleInSegment;
 
