@@ -152,40 +152,8 @@ function init() {
     let voiceRecognition = null;
     let isListening = false;
 
-    const handleNextMonth = () => {
-        const nextDate = new Date(currentSelectedDate);
-        nextDate.setMonth(nextDate.getMonth() + 1);
-        
-        // Update year if needed
-        if (nextDate.getFullYear() !== currentYear) {
-            currentYear = nextDate.getFullYear();
-            yearInput.value = currentYear;
-            setYear(currentYear);
-            drawCalendar();
-            drawCircle();
-        }
-        
-        selectDate(nextDate);
-    };
-
-    const handlePreviousMonth = () => {
-        const prevDate = new Date(currentSelectedDate);
-        prevDate.setMonth(prevDate.getMonth() - 1);
-        
-        // Update year if needed
-        if (prevDate.getFullYear() !== currentYear) {
-            currentYear = prevDate.getFullYear();
-            yearInput.value = currentYear;
-            setYear(currentYear);
-            drawCalendar();
-            drawCircle();
-        }
-        
-        selectDate(prevDate);
-    };
-
-    const handleSelectDate = (date) => {
-        const year = date.getFullYear();
+    // Helper function to update year if needed
+    const updateYearIfNeeded = (year) => {
         if (year !== currentYear) {
             currentYear = year;
             yearInput.value = year;
@@ -193,6 +161,24 @@ function init() {
             drawCalendar();
             drawCircle();
         }
+    };
+
+    const handleNextMonth = () => {
+        const nextDate = new Date(currentSelectedDate);
+        nextDate.setMonth(nextDate.getMonth() + 1);
+        updateYearIfNeeded(nextDate.getFullYear());
+        selectDate(nextDate);
+    };
+
+    const handlePreviousMonth = () => {
+        const prevDate = new Date(currentSelectedDate);
+        prevDate.setMonth(prevDate.getMonth() - 1);
+        updateYearIfNeeded(prevDate.getFullYear());
+        selectDate(prevDate);
+    };
+
+    const handleSelectDate = (date) => {
+        updateYearIfNeeded(date.getFullYear());
         selectDate(date);
     };
 

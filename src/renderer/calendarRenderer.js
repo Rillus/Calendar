@@ -19,6 +19,13 @@ import {
   moonDistance,
   padding
 } from '../config/config.js';
+
+// Tooltip dimensions
+const TOOLTIP_HEIGHT = 20;
+const TOOLTIP_VERTICAL_OFFSET = 25; // Distance above moon
+const TOOLTIP_TEXT_OFFSET = 15; // Text offset from moon
+const TOOLTIP_PADDING = 10;
+const TOOLTIP_MARGIN = 5; // Minimum margin from SVG edge
 import { rgbToHex, getContrastColor } from '../utils/colorUtils.js';
 import { getThemeColor, getDarkMode } from '../utils/darkMode.js';
 import { degreesToRadians, sumTo, polarToCartesian } from '../utils/mathUtils.js';
@@ -128,6 +135,92 @@ export function createCalendarRenderer(svgElement, options = {}) {
   const viewStateManager = new ViewStateManager();
   let isRestoringView = false; // Flag to prevent pushing views during restore
 
+  /**
+   * Creates an SVG text element with common attributes
+   * @param {Object} options - Configuration options
+   * @returns {SVGTextElement} The created text element
+   */
+  const createSvgText = (options = {}) => {
+    const {
+      x,
+      y,
+      textContent,
+      className = '',
+      fontSize,
+      fontFamily = 'Helvetica, Arial, sans-serif',
+      fontWeight = 'normal',
+      fill,
+      transform,
+      dataAttributes = {},
+      ariaHidden = false
+    } = options;
+
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    
+    if (x !== undefined) text.setAttribute('x', x);
+    if (y !== undefined) text.setAttribute('y', y);
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('dominant-baseline', 'middle');
+    if (className) text.setAttribute('class', className);
+    if (transform) text.setAttribute('transform', transform);
+    if (textContent !== undefined) text.textContent = textContent;
+    if (fontSize) text.style.fontSize = fontSize;
+    text.style.fontFamily = fontFamily;
+    text.style.fontWeight = fontWeight;
+    text.style.pointerEvents = 'none';
+    if (fill) text.style.fill = fill;
+    
+    // Add data attributes
+    Object.entries(dataAttributes).forEach(([key, value]) => {
+      text.setAttribute(`data-${key}`, String(value));
+    });
+    
+    // Add drop shadow for white text
+    if (fill === '#fff') {
+      text.style.filter = 'drop-shadow(0px 0px 5px rgba(255, 255, 255, 0.2))';
+    }
+    
+    if (ariaHidden) {
+      setAriaHidden(text, true);
+    }
+    
+    return text;
+  };
+
+  /**
+   * Creates a rotated text label positioned around a circle
+   * @param {Object} options - Configuration options
+   * @returns {SVGTextElement} The created text element
+   */
+  const createRotatedLabel = (options = {}) => {
+    const {
+      labelAngle,
+      labelRadius,
+      textContent,
+      className = '',
+      fontSize,
+      fontWeight = 'normal',
+      fill,
+      dataAttributes = {}
+    } = options;
+
+    const labelPos = polarToCartesian(centerX, centerY, labelRadius, labelAngle);
+    const textRotation = calculateTextRotation(labelAngle, labelPos, centerX, centerY);
+    
+    return createSvgText({
+      x: labelPos[0],
+      y: labelPos[1],
+      textContent,
+      className,
+      fontSize,
+      fontWeight,
+      fill,
+      transform: `rotate(${textRotation} ${labelPos[0]} ${labelPos[1]})`,
+      dataAttributes,
+      ariaHidden: true
+    });
+  };
+
   const notifyDateChanged = (date) => {
     const safeDate = createSafeDateCopy(date);
     for (const listener of dateChangeListeners) {
@@ -185,16 +278,15 @@ export function createCalendarRenderer(svgElement, options = {}) {
     errorGroup.setAttribute('role', 'alert');
     errorGroup.setAttribute('aria-live', 'assertive');
     
-    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    text.setAttribute('x', centerX);
-    text.setAttribute('y', centerY + 60);
-    text.setAttribute('text-anchor', 'middle');
-    text.setAttribute('dominant-baseline', 'middle');
-    text.setAttribute('class', 'error-text');
-    text.setAttribute('fill', '#d32f2f');
-    text.style.fontSize = `${svgSize / 30}px`;
-    text.style.fontFamily = 'Helvetica, Arial, sans-serif';
-    text.textContent = message;
+    const text = createSvgText({
+      x: centerX,
+      y: centerY + 60,
+      textContent: message,
+      className: 'error-text',
+      fontSize: `${svgSize / 30}px`,
+      fill: '#d32f2f',
+      ariaHidden: false
+    });
     
     errorGroup.appendChild(text);
     svg.appendChild(errorGroup);
@@ -402,32 +494,18 @@ export function createCalendarRenderer(svgElement, options = {}) {
 
         const labelAngle = degreesToRadians(sumTo(data, i)) - degreesToRadians(90) + (arcSize / 2);
         const labelRadius = radius * outerRadiusRatio * 0.95;
-        const labelPos = polarToCartesian(centerX, centerY, labelRadius, labelAngle);
-
-        const textRotation = calculateTextRotation(labelAngle, labelPos, centerX, centerY);
-
-        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        text.setAttribute('x', labelPos[0]);
-        text.setAttribute('y', labelPos[1]);
-        text.setAttribute('text-anchor', 'middle');
-        text.setAttribute('dominant-baseline', 'middle');
-        text.setAttribute('transform', `rotate(${textRotation} ${labelPos[0]} ${labelPos[1]})`);
-        text.setAttribute('class', 'segment-label');
-        text.setAttribute('data-segment-index', i);
-        text.textContent = labels[i];
-        text.style.fontSize = `${svgSize / 35}px`;
-        text.style.fontFamily = 'Helvetica, Arial, sans-serif';
-        text.style.fontWeight = 'bold';
-        text.style.pointerEvents = 'none';
-        // Text label is decorative - ARIA info is on the path element
-        setAriaHidden(text, true);
-
         const contrastColor = getContrastColor(monthColor);
-        text.style.fill = contrastColor;
-        // Only add drop shadow for white text (dark backgrounds)
-        if (contrastColor === '#fff') {
-          text.style.filter = 'drop-shadow(0px 0px 5px rgba(255, 255, 255, 0.2))';
-        }
+
+        const text = createRotatedLabel({
+          labelAngle,
+          labelRadius,
+          textContent: labels[i],
+          className: 'segment-label',
+          fontSize: `${svgSize / 35}px`,
+          fontWeight: 'bold',
+          fill: contrastColor,
+          dataAttributes: { 'segment-index': i }
+        });
 
         segmentsGroupEl.appendChild(text);
       }
@@ -462,17 +540,17 @@ export function createCalendarRenderer(svgElement, options = {}) {
     circle.setAttribute('class', 'center-circle');
     svg.appendChild(circle);
 
-    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    text.setAttribute('x', centerX);
-    text.setAttribute('y', centerY);
-    text.setAttribute('text-anchor', 'middle');
-    text.setAttribute('dominant-baseline', 'middle');
-    text.setAttribute('class', 'center-text');
-    text.textContent = months[monthIndex];
-    text.style.fontSize = '16px';
-    text.style.fontFamily = 'Helvetica, Arial, sans-serif';
-    text.style.fontWeight = 'bold';
-    text.style.fill = getContrastColor(monthColour);
+    const text = createSvgText({
+      x: centerX,
+      y: centerY,
+      textContent: months[monthIndex],
+      className: 'center-text',
+      fontSize: '16px',
+      fontWeight: 'bold',
+      fill: getContrastColor(monthColour),
+      ariaHidden: false
+    });
+
     svg.appendChild(text);
   };
 
@@ -646,29 +724,17 @@ export function createCalendarRenderer(svgElement, options = {}) {
         // Day number labels around the outside, similar to month labels.
         const labelAngle = startingAngle + (arcSize / 2);
         const labelRadius = radius * fullRadius * 0.95;
-        const labelPos = polarToCartesian(centerX, centerY, labelRadius, labelAngle);
 
-        const textRotation = calculateTextRotation(labelAngle, labelPos, centerX, centerY);
-
-        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        text.setAttribute('x', labelPos[0]);
-        text.setAttribute('y', labelPos[1]);
-        text.setAttribute('text-anchor', 'middle');
-        text.setAttribute('dominant-baseline', 'middle');
-        text.setAttribute('transform', `rotate(${textRotation} ${labelPos[0]} ${labelPos[1]})`);
-        text.setAttribute('class', 'day-label');
-        text.setAttribute('data-day', String(day));
-        text.textContent = String(day);
-        text.style.fontSize = `${svgSize / 40}px`;
-        text.style.fontFamily = 'Helvetica, Arial, sans-serif';
-        text.style.fontWeight = 'bold';
-        text.style.pointerEvents = 'none';
-        text.style.fill = dayLabelColour;
-        if (dayLabelColour === '#fff') {
-          text.style.filter = 'drop-shadow(0px 0px 5px rgba(255, 255, 255, 0.2))';
-        }
-        // Text label is decorative - ARIA info is on the path element
-        setAriaHidden(text, true);
+        const text = createRotatedLabel({
+          labelAngle,
+          labelRadius,
+          textContent: String(day),
+          className: 'day-label',
+          fontSize: `${svgSize / 40}px`,
+          fontWeight: 'bold',
+          fill: dayLabelColour,
+          dataAttributes: { day }
+        });
 
         group.appendChild(text);
       }
@@ -879,29 +945,17 @@ export function createCalendarRenderer(svgElement, options = {}) {
         // Day number labels around the outside
         const labelAngle = startingAngle + (arcSize / 2);
         const labelRadius = radius * fullRadius * 0.95;
-        const labelPos = polarToCartesian(centerX, centerY, labelRadius, labelAngle);
 
-        const textRotation = calculateTextRotation(labelAngle, labelPos, centerX, centerY);
-
-        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        text.setAttribute('x', labelPos[0]);
-        text.setAttribute('y', labelPos[1]);
-        text.setAttribute('text-anchor', 'middle');
-        text.setAttribute('dominant-baseline', 'middle');
-        text.setAttribute('transform', `rotate(${textRotation} ${labelPos[0]} ${labelPos[1]})`);
-        text.setAttribute('class', 'week-day-label');
-        text.setAttribute('data-day-index', String(i));
-        text.textContent = String(day);
-        text.style.fontSize = `${svgSize / 40}px`;
-        text.style.fontFamily = 'Helvetica, Arial, sans-serif';
-        text.style.fontWeight = 'bold';
-        text.style.pointerEvents = 'none';
-        text.style.fill = dayLabelColour;
-        if (dayLabelColour === '#fff') {
-          text.style.filter = 'drop-shadow(0px 0px 5px rgba(255, 255, 255, 0.2))';
-        }
-        // Text label is decorative - ARIA info is on the path element
-        setAriaHidden(text, true);
+        const text = createRotatedLabel({
+          labelAngle,
+          labelRadius,
+          textContent: String(day),
+          className: 'week-day-label',
+          fontSize: `${svgSize / 40}px`,
+          fontWeight: 'bold',
+          fill: dayLabelColour,
+          dataAttributes: { 'day-index': i }
+        });
 
         group.appendChild(text);
       }
@@ -974,21 +1028,22 @@ export function createCalendarRenderer(svgElement, options = {}) {
     group.setAttribute('class', 'ampm-selector-group');
 
     const makeLabel = (label, xOffset) => {
-      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      text.setAttribute('x', String(centerX + xOffset));
-      text.setAttribute('y', String(centerY + 32));
-      text.setAttribute('text-anchor', 'middle');
-      text.setAttribute('dominant-baseline', 'middle');
-      text.setAttribute('class', 'ampm-selector');
-      text.setAttribute('data-meridiem', label);
-      text.textContent = label;
-      text.style.fontFamily = 'Helvetica, Arial, sans-serif';
-      text.style.fontSize = '12px';
-      text.style.cursor = 'pointer';
       const selected = pendingMeridiem === label;
-      text.style.fontWeight = selected ? 'bold' : 'normal';
-      text.style.fill = selected ? getCssVariable('--svg-center-text-main', '#111') : getCssVariable('--svg-center-text-day', '#666');
-
+      const text = createSvgText({
+        x: String(centerX + xOffset),
+        y: String(centerY + 32),
+        textContent: label,
+        className: 'ampm-selector',
+        fontSize: '12px',
+        fontWeight: selected ? 'bold' : 'normal',
+        fill: selected ? getCssVariable('--svg-center-text-main', '#111') : getCssVariable('--svg-center-text-day', '#666'),
+        dataAttributes: { meridiem: label },
+        ariaHidden: false
+      });
+      
+      text.style.pointerEvents = 'auto';
+      text.style.cursor = 'pointer';
+      
       text.addEventListener('click', (e) => {
         e.preventDefault();
         pendingMeridiem = label;
@@ -1110,25 +1165,17 @@ export function createCalendarRenderer(svgElement, options = {}) {
 
       const labelAngle = startingAngle + (arcSize / 2);
       const labelRadius = radius * outerRadiusRatio * 0.90;
-      const labelPos = polarToCartesian(centerX, centerY, labelRadius, labelAngle);
 
-      const textRotation = calculateTextRotation(labelAngle, labelPos, centerX);
+      const text = createRotatedLabel({
+        labelAngle,
+        labelRadius,
+        textContent: String(displayHour).padStart(2, '0'),
+        className: 'hour-label',
+        fontSize: `${svgSize / 55}px`,
+        fontWeight: 'bold',
+        fill: getCssVariable('--svg-center-text-day', '#333')
+      });
 
-      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      text.setAttribute('x', labelPos[0]);
-      text.setAttribute('y', labelPos[1]);
-      text.setAttribute('text-anchor', 'middle');
-      text.setAttribute('dominant-baseline', 'middle');
-      text.setAttribute('transform', `rotate(${textRotation} ${labelPos[0]} ${labelPos[1]})`);
-      text.setAttribute('class', 'hour-label');
-      text.textContent = String(displayHour).padStart(2, '0');
-      text.style.fontSize = `${svgSize / 55}px`;
-      text.style.fontFamily = 'Helvetica, Arial, sans-serif';
-      text.style.fontWeight = 'bold';
-      text.style.pointerEvents = 'none';
-      text.style.fill = getCssVariable('--svg-center-text-day', '#333');
-      // Text label is decorative - ARIA info is on the path element
-      setAriaHidden(text, true);
       group.appendChild(text);
     }
 
@@ -1316,31 +1363,22 @@ export function createCalendarRenderer(svgElement, options = {}) {
 
       const labelAngle = startingAngle + (arcSize / 2);
       const labelRadius = radius * outerRadiusRatio * 0.92;
-      const labelPos = polarToCartesian(centerX, centerY, labelRadius, labelAngle);
-
-      const textRotation = calculateTextRotation(labelAngle, labelPos, centerX);
-
-      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      text.setAttribute('x', labelPos[0]);
-      text.setAttribute('y', labelPos[1]);
-      text.setAttribute('text-anchor', 'middle');
-      text.setAttribute('dominant-baseline', 'middle');
-      text.setAttribute('transform', `rotate(${textRotation} ${labelPos[0]} ${labelPos[1]})`);
-      text.setAttribute('class', 'minute-label');
-      text.textContent = String(minute);
 
       const base = svgSize / 70;
       const fontSize =
         minute === 0 || minute === 30 ? base * 1.8
           : (minute === 15 || minute === 45 ? base * 1.35 : base);
 
-      text.style.fontSize = `${fontSize}px`;
-      text.style.fontFamily = 'Helvetica, Arial, sans-serif';
-      text.style.fontWeight = minute === 0 || minute === 30 ? 'bold' : 'normal';
-      text.style.pointerEvents = 'none';
-      text.style.fill = getCssVariable('--svg-center-text-day', '#333');
-      // Text label is decorative - ARIA info is on the path element
-      setAriaHidden(text, true);
+      const text = createRotatedLabel({
+        labelAngle,
+        labelRadius,
+        textContent: String(minute),
+        className: 'minute-label',
+        fontSize: `${fontSize}px`,
+        fontWeight: minute === 0 || minute === 30 ? 'bold' : 'normal',
+        fill: getCssVariable('--svg-center-text-day', '#333')
+      });
+
       group.appendChild(text);
       }
 
@@ -1428,67 +1466,51 @@ export function createCalendarRenderer(svgElement, options = {}) {
       const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
       const dayOfWeek = dayNames[date.getDay()];
 
-      const dayText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      dayText.setAttribute('x', centerX);
-      dayText.setAttribute('y', dayOfWeekY);
-      dayText.setAttribute('text-anchor', 'middle');
-      dayText.setAttribute('dominant-baseline', 'middle');
-      dayText.setAttribute('class', 'center-text');
-      dayText.textContent = dayOfWeek;
-      dayText.style.fontSize = `${smallFontSize}px`;
-      dayText.style.fontFamily = 'Helvetica, Arial, sans-serif';
-      dayText.style.fill = getCssVariable('--svg-center-text-day', '#333');
+      const dayText = createSvgText({
+        x: centerX,
+        y: dayOfWeekY,
+        textContent: dayOfWeek,
+        className: 'center-text',
+        fontSize: `${smallFontSize}px`,
+        fill: getCssVariable('--svg-center-text-day', '#333'),
+        ariaHidden: false
+      });
       svg.appendChild(dayText);
     }
-
-    const mainText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    mainText.setAttribute('x', centerX);
-    mainText.setAttribute('y', mainY);
-    mainText.setAttribute('text-anchor', 'middle');
-    mainText.setAttribute('dominant-baseline', 'middle');
-    mainText.setAttribute('class', 'center-text');
 
     let textContent = segment;
     if (date) {
       const day = date.getDate();
-      textContent = `${segment} ${day}`;
+      const monthIndex = date.getMonth();
+      // Use full month name when displaying a date
+      const monthName = fullMonthNames[monthIndex];
+      textContent = `${day} ${monthName}`;
     }
 
-    mainText.textContent = textContent;
-    mainText.style.fontSize = `${mainFontSize}px`;
-    mainText.style.fontFamily = 'Helvetica, Arial, sans-serif';
-    mainText.style.fill = getCssVariable('--svg-center-text-main', '#333');
+    const mainText = createSvgText({
+      x: centerX,
+      y: mainY,
+      textContent,
+      className: 'center-text',
+      fontSize: `${mainFontSize}px`,
+      fill: getCssVariable('--svg-center-text-main', '#333'),
+      ariaHidden: false
+    });
     svg.appendChild(mainText);
 
     if (date) {
       const year = date.getFullYear();
 
-      const yearText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      yearText.setAttribute('x', centerX);
-      yearText.setAttribute('y', yearY);
-      yearText.setAttribute('text-anchor', 'middle');
-      yearText.setAttribute('dominant-baseline', 'middle');
-      yearText.setAttribute('class', 'center-text');
-      yearText.textContent = year.toString();
-      yearText.style.fontSize = `${smallFontSize}px`;
-      yearText.style.fontFamily = 'Helvetica, Arial, sans-serif';
-      yearText.style.fill = getCssVariable('--svg-center-text-day', '#333');
+      const yearText = createSvgText({
+        x: centerX,
+        y: yearY,
+        textContent: year.toString(),
+        className: 'center-text',
+        fontSize: `${smallFontSize}px`,
+        fill: getCssVariable('--svg-center-text-day', '#333'),
+        ariaHidden: false
+      });
       svg.appendChild(yearText);
-
-      const moonPhaseName = getMoonPhaseName(date);
-      const moonPhaseY = yearY + smallFontSize + lineSpacing;
-
-      const moonPhaseText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      moonPhaseText.setAttribute('x', centerX);
-      moonPhaseText.setAttribute('y', moonPhaseY);
-      moonPhaseText.setAttribute('text-anchor', 'middle');
-      moonPhaseText.setAttribute('dominant-baseline', 'middle');
-      moonPhaseText.setAttribute('class', 'center-text');
-      moonPhaseText.textContent = moonPhaseName;
-      moonPhaseText.style.fontSize = `${smallFontSize}px`;
-      moonPhaseText.style.fontFamily = 'Helvetica, Arial, sans-serif';
-      moonPhaseText.style.fill = getCssVariable('--svg-center-text-moon', '#666');
-      svg.appendChild(moonPhaseText);
     }
   };
 
@@ -1601,6 +1623,16 @@ export function createCalendarRenderer(svgElement, options = {}) {
         if (shadow) {
           shadow.setAttribute('cx', String(shadowDx));
         }
+        
+        // Update moon group date attribute
+        if (moonGroup) {
+          moonGroup.setAttribute('data-date', date.getTime().toString());
+          
+          // Update tooltip if it's visible using the stored update function
+          if (moonGroup._updateTooltip) {
+            moonGroup._updateTooltip();
+          }
+        }
       }
     };
 
@@ -1649,7 +1681,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
     }, { passive: true });
   };
 
-  const showSunAndMoon = (sunPos, moonPos, makeDraggable = false, moonPhase = null) => {
+  const showSunAndMoon = (sunPos, moonPos, makeDraggable = false, moonPhase = null, date = null) => {
     hideSunAndMoon();
 
     const sunGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -1688,6 +1720,14 @@ export function createCalendarRenderer(svgElement, options = {}) {
     const moonGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     moonGroup.setAttribute('class', 'moon-icon');
     moonGroup.setAttribute('transform', `translate(${moonPos[0]}, ${moonPos[1]})`);
+    // Make moon semi-transparent
+    moonGroup.setAttribute('opacity', '0.6');
+    moonGroup.style.pointerEvents = 'all';
+    moonGroup.style.cursor = 'pointer';
+    // Store the date on the moon group for tooltip updates
+    if (date) {
+      moonGroup.setAttribute('data-date', date.getTime().toString());
+    }
 
     const moonRadius = 6;
     const clipId = `moon-clip-${moonClipIdCounter++}`;
@@ -1732,8 +1772,188 @@ export function createCalendarRenderer(svgElement, options = {}) {
     moonOutline.setAttribute('class', 'moon-icon__outline');
     moonGroup.appendChild(moonOutline);
 
+    // Add tooltip functionality
+    // Function to get current moon position from transform
+    const getCurrentMoonPosition = () => {
+      const transform = moonGroup.getAttribute('transform');
+      if (!transform) return moonPos;
+      const match = transform.match(/translate\(([^,]+),\s*([^)]+)\)/);
+      if (match) {
+        return { x: parseFloat(match[1]), y: parseFloat(match[2]) };
+      }
+      return moonPos;
+    };
+
+    // Function to get current date from moon group
+    const getCurrentDate = () => {
+      const dateStr = moonGroup.getAttribute('data-date');
+      if (dateStr) {
+        return new Date(parseInt(dateStr, 10));
+      }
+      return date;
+    };
+
+    // Function to calculate tooltip position within SVG bounds
+    const calculateTooltipPosition = (moonPos, tooltipWidth) => {
+      // Start with position above moon (centered)
+      let bgX = moonPos.x - tooltipWidth / 2;
+      let bgY = moonPos.y - TOOLTIP_VERTICAL_OFFSET;
+      let textX = moonPos.x;
+      let textY = moonPos.y - TOOLTIP_TEXT_OFFSET;
+      
+      // Check horizontal bounds
+      if (bgX < TOOLTIP_MARGIN) {
+        // Too far left, shift right
+        bgX = TOOLTIP_MARGIN;
+        textX = bgX + tooltipWidth / 2;
+      } else if (bgX + tooltipWidth > svgSize - TOOLTIP_MARGIN) {
+        // Too far right, shift left
+        bgX = svgSize - TOOLTIP_MARGIN - tooltipWidth;
+        textX = bgX + tooltipWidth / 2;
+      }
+      
+      // Check vertical bounds
+      if (bgY < TOOLTIP_MARGIN) {
+        // Too high, move below moon instead
+        bgY = moonPos.y + TOOLTIP_VERTICAL_OFFSET;
+        textY = moonPos.y + TOOLTIP_TEXT_OFFSET;
+      } else if (bgY + TOOLTIP_HEIGHT > svgSize - TOOLTIP_MARGIN) {
+        // Too low, move above but adjust if needed
+        bgY = Math.max(TOOLTIP_MARGIN, moonPos.y - TOOLTIP_VERTICAL_OFFSET);
+        textY = bgY + TOOLTIP_TEXT_OFFSET;
+      }
+      
+      return { bgX, bgY, textX, textY };
+    };
+
+    // Function to update tooltip with current position and date
+    const updateTooltip = () => {
+      const currentDate = getCurrentDate();
+      if (!currentDate) return;
+      
+      const tooltip = svg.querySelector('.moon-tooltip');
+      const tooltipBg = svg.querySelector('.moon-tooltip-bg');
+      
+      if (!tooltip || !tooltipBg) return;
+      
+      const currentPos = getCurrentMoonPosition();
+      const moonPhaseName = getMoonPhaseName(currentDate);
+      const tooltipText = `Lunar phase: ${moonPhaseName}`;
+      
+      // Update tooltip text
+      tooltip.textContent = tooltipText;
+      
+      // Calculate tooltip dimensions
+      const estimatedWidth = tooltipText.length * 7;
+      const tooltipWidth = estimatedWidth + TOOLTIP_PADDING * 2;
+      
+      // Calculate position within bounds
+      const pos = calculateTooltipPosition(currentPos, tooltipWidth);
+      
+      // Update tooltip position
+      tooltip.setAttribute('x', String(pos.textX));
+      tooltip.setAttribute('y', String(pos.textY));
+      
+      // Update background position and size
+      tooltipBg.setAttribute('x', String(pos.bgX));
+      tooltipBg.setAttribute('y', String(pos.bgY));
+      tooltipBg.setAttribute('width', String(tooltipWidth));
+    };
+
+    const showTooltip = () => {
+      const currentDate = getCurrentDate();
+      if (!currentDate) return;
+      
+      // Remove existing tooltip
+      removeIfPresent('.moon-tooltip');
+      removeIfPresent('.moon-tooltip-bg');
+      
+      const currentPos = getCurrentMoonPosition();
+      const moonPhaseName = getMoonPhaseName(currentDate);
+      const tooltipText = `Lunar phase: ${moonPhaseName}`;
+      
+      // Calculate tooltip dimensions
+      const estimatedWidth = tooltipText.length * 7;
+      const tooltipWidth = estimatedWidth + TOOLTIP_PADDING * 2;
+      
+      // Calculate position within bounds
+      const pos = calculateTooltipPosition(currentPos, tooltipWidth);
+      
+      // Add background rectangle for better visibility
+      const tooltipBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      tooltipBg.setAttribute('x', String(pos.bgX));
+      tooltipBg.setAttribute('y', String(pos.bgY));
+      tooltipBg.setAttribute('width', String(tooltipWidth));
+      tooltipBg.setAttribute('height', String(TOOLTIP_HEIGHT));
+      tooltipBg.setAttribute('fill', getCssVariable('--card-bg', '#ffffff'));
+      tooltipBg.setAttribute('stroke', getCssVariable('--svg-stroke', '#ddd'));
+      tooltipBg.setAttribute('stroke-width', '1');
+      tooltipBg.setAttribute('rx', '4');
+      tooltipBg.setAttribute('opacity', '0.95');
+      tooltipBg.setAttribute('class', 'moon-tooltip-bg');
+      tooltipBg.style.pointerEvents = 'none';
+      
+      const tooltip = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      tooltip.setAttribute('class', 'moon-tooltip');
+      tooltip.setAttribute('x', String(pos.textX));
+      tooltip.setAttribute('y', String(pos.textY));
+      tooltip.setAttribute('text-anchor', 'middle');
+      tooltip.setAttribute('dominant-baseline', 'middle');
+      tooltip.textContent = tooltipText;
+      tooltip.style.fontSize = '12px';
+      tooltip.style.fontFamily = 'Helvetica, Arial, sans-serif';
+      tooltip.style.fill = getCssVariable('--svg-center-text-main', '#333');
+      tooltip.style.pointerEvents = 'none';
+      tooltip.setAttribute('opacity', '0.9');
+      
+      svg.appendChild(tooltipBg);
+      svg.appendChild(tooltip);
+    };
+
+    const hideTooltip = () => {
+      removeIfPresent('.moon-tooltip');
+      removeIfPresent('.moon-tooltip-bg');
+    };
+
+    // Store update function on moon group so it can be called externally
+    moonGroup._updateTooltip = updateTooltip;
+    
+    // Add hover handlers
+    moonGroup.addEventListener('mouseenter', showTooltip);
+    moonGroup.addEventListener('mouseleave', hideTooltip);
+    
+    // Add tap handler for mobile
+    let touchStartTime = 0;
+    moonGroup.addEventListener('touchstart', (e) => {
+      touchStartTime = Date.now();
+      e.preventDefault();
+    }, { passive: false });
+    
+    moonGroup.addEventListener('touchend', (e) => {
+      const touchDuration = Date.now() - touchStartTime;
+      // Treat as tap if duration is short (< 300ms)
+      if (touchDuration < 300) {
+        const existingTooltip = svg.querySelector('.moon-tooltip');
+        if (existingTooltip) {
+          hideTooltip();
+        } else {
+          showTooltip();
+          // Auto-hide after 3 seconds on mobile
+          setTimeout(hideTooltip, 3000);
+        }
+      }
+      e.preventDefault();
+    }, { passive: false });
+
     svg.appendChild(sunGroup);
     svg.appendChild(moonGroup);
+
+    // Update tooltip if it was visible before (moon was recreated)
+    const tooltip = svg.querySelector('.moon-tooltip');
+    if (tooltip && moonGroup._updateTooltip) {
+      // Tooltip exists but moon was recreated, so update it
+      moonGroup._updateTooltip();
+    }
 
     if (makeDraggable) {
       setupSunDragHandlers(sunGroup);
@@ -1766,7 +1986,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
     const moonRadius = radius + moonDistance;
     const moonPos = polarToCartesian(centerX, centerY, moonRadius, moonAngle);
 
-    showSunAndMoon(sunPos, moonPos, true, moonPhase);
+    showSunAndMoon(sunPos, moonPos, true, moonPhase, date);
   };
 
   // Track currently selected date for navigation functions

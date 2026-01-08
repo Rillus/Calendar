@@ -11,11 +11,22 @@
  */
 function isTestEnvironment() {
   // Check for common test environment indicators
+  // Only return true if we're definitely in a test AND window.matchMedia is not available
+  // This allows tests to mock window.matchMedia properly
+  if (typeof window === 'undefined') {
+    return true;
+  }
+  
+  // If window.matchMedia exists and is callable, we're not in a pure test environment
+  // (tests can mock it)
+  if (typeof window.matchMedia === 'function') {
+    return false;
+  }
+  
+  // Otherwise, check for test environment indicators
   return typeof process !== 'undefined' && 
          (process.env.NODE_ENV === 'test' || 
-          process.env.VITEST === 'true' ||
-          typeof window === 'undefined' ||
-          !window.matchMedia);
+          process.env.VITEST === 'true');
 }
 
 /**
@@ -23,12 +34,13 @@ function isTestEnvironment() {
  * @returns {boolean} True if prefers-reduced-motion is set
  */
 export function shouldReduceMotion() {
-  if (isTestEnvironment()) {
-    return true; // Always reduce motion in tests for synchronous behavior
-  }
-  
   if (typeof window === 'undefined' || !window.matchMedia) {
     return false;
+  }
+  
+  // If we're in a test environment without a proper mock, reduce motion
+  if (isTestEnvironment()) {
+    return true;
   }
   
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;

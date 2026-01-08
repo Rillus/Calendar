@@ -23,32 +23,12 @@ export function rgbToRgbString(colour) {
 
 // Interpolates between two colours
 export function colourSum(colour1, colour2, steps, thisStep) {
-    const colourDiff = [];
-    const new2 = [];
-    
-    colourDiff.push((Math.max(colour1[0], colour2[0]) - Math.min(colour1[0], colour2[0])) / steps);
-    colourDiff.push((Math.max(colour1[1], colour2[1]) - Math.min(colour1[1], colour2[1])) / steps);
-    colourDiff.push((Math.max(colour1[2], colour2[2]) - Math.min(colour1[2], colour2[2])) / steps);
-    
-    if (colour1[0] < colour2[0]) {
-        new2.push(Math.round(colour1[0] + (colourDiff[0] * thisStep)));
-    } else {
-        new2.push(Math.round(colour1[0] - (colourDiff[0] * thisStep)));
-    }
-    
-    if (colour1[1] < colour2[1]) {
-        new2.push(Math.round(colour1[1] + (colourDiff[1] * thisStep)));
-    } else {
-        new2.push(Math.round(colour1[1] - (colourDiff[1] * thisStep)));
-    }
-    
-    if (colour1[2] < colour2[2]) {
-        new2.push(Math.round(colour1[2] + (colourDiff[2] * thisStep)));
-    } else {
-        new2.push(Math.round(colour1[2] - (colourDiff[2] * thisStep)));
-    }
-    
-    return new2;
+    return colour1.map((component1, index) => {
+        const component2 = colour2[index];
+        const diff = (Math.max(component1, component2) - Math.min(component1, component2)) / steps;
+        const increment = component1 < component2 ? diff * thisStep : -diff * thisStep;
+        return Math.round(component1 + increment);
+    });
 }
 
 /**

@@ -64,7 +64,8 @@ describe('calendarRenderer', () => {
       const firstPath = segmentsGroup.querySelector('path');
       
       expect(firstPath).not.toBeNull();
-      expect(firstPath.getAttribute('class')).toBe('calendar-segment');
+      // Class may include 'hover-scale' added by addHoverScale
+      expect(firstPath.getAttribute('class')).toContain('calendar-segment');
       expect(firstPath.getAttribute('stroke')).toBe('#fff');
       expect(firstPath.getAttribute('stroke-width')).toBe('1');
       expect(firstPath.style.cursor).toBe('pointer');
@@ -1147,6 +1148,277 @@ describe('calendarRenderer', () => {
           expect(day.getAttribute('tabindex')).not.toBe('0');
         });
       }
+    });
+  });
+
+  describe('moon tooltip functionality', () => {
+    beforeEach(() => {
+      initRenderer(mockSvg);
+      drawCalendar();
+    });
+
+    it('should make moon semi-transparent', () => {
+      const date = new Date(2026, 0, 10);
+      selectDate(date);
+
+      const moon = mockSvg.querySelector('.moon-icon');
+      expect(moon).not.toBeNull();
+      
+      const opacity = moon.getAttribute('opacity') || moon.style.opacity;
+      const computedOpacity = window.getComputedStyle ? 
+        getComputedStyle(moon).opacity : opacity;
+      
+      // Moon should be semi-transparent (opacity < 1)
+      const actualOpacity = parseFloat(opacity || computedOpacity || '1');
+      expect(actualOpacity).toBeLessThan(1);
+      expect(actualOpacity).toBeGreaterThan(0);
+    });
+
+    it('should show tooltip on hover with lunar phase', () => {
+      const date = new Date(2026, 0, 10);
+      selectDate(date);
+
+      const moon = mockSvg.querySelector('.moon-icon');
+      expect(moon).not.toBeNull();
+
+      // Initially no tooltip
+      let tooltip = mockSvg.querySelector('.moon-tooltip');
+      expect(tooltip).toBeNull();
+
+      // Simulate hover
+      const mouseEnterEvent = new MouseEvent('mouseenter', { bubbles: true });
+      moon.dispatchEvent(mouseEnterEvent);
+
+      // Tooltip should appear
+      tooltip = mockSvg.querySelector('.moon-tooltip');
+      expect(tooltip).not.toBeNull();
+      expect(tooltip.textContent).toContain('Lunar phase:');
+    });
+
+    it('should show tooltip on tap (mobile)', async () => {
+      const date = new Date(2026, 0, 10);
+      selectDate(date);
+
+      const moon = mockSvg.querySelector('.moon-icon');
+      expect(moon).not.toBeNull();
+
+      // Initially no tooltip
+      let tooltip = mockSvg.querySelector('.moon-tooltip');
+      expect(tooltip).toBeNull();
+
+      // Simulate tap - create a mock touch event with proper structure
+      const touchStartEvent = new Event('touchstart', { bubbles: false, cancelable: true });
+      Object.defineProperty(touchStartEvent, 'touches', {
+        value: [{ clientX: 0, clientY: 0 }],
+        writable: false,
+        configurable: true
+      });
+      moon.dispatchEvent(touchStartEvent);
+
+      // Wait a bit for touchstart to register
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      // Simulate touchend after a short delay (simulating quick tap)
+      const touchEndEvent = new Event('touchend', { bubbles: false, cancelable: true });
+      Object.defineProperty(touchEndEvent, 'changedTouches', {
+        value: [{ clientX: 0, clientY: 0 }],
+        writable: false,
+        configurable: true
+      });
+      moon.dispatchEvent(touchEndEvent);
+
+      // Wait for tooltip to appear
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      tooltip = mockSvg.querySelector('.moon-tooltip');
+      expect(tooltip).not.toBeNull();
+      expect(tooltip.textContent).toContain('Lunar phase:');
+    });
+
+    it('should hide tooltip on mouse leave', () => {
+      const date = new Date(2026, 0, 10);
+      selectDate(date);
+
+      const moon = mockSvg.querySelector('.moon-icon');
+      expect(moon).not.toBeNull();
+
+      // Show tooltip
+      const mouseEnterEvent = new MouseEvent('mouseenter', { bubbles: true });
+      moon.dispatchEvent(mouseEnterEvent);
+      let tooltip = mockSvg.querySelector('.moon-tooltip');
+      expect(tooltip).not.toBeNull();
+
+      // Hide tooltip
+      const mouseLeaveEvent = new MouseEvent('mouseleave', { bubbles: true });
+      moon.dispatchEvent(mouseLeaveEvent);
+      tooltip = mockSvg.querySelector('.moon-tooltip');
+      expect(tooltip).toBeNull();
+    });
+
+    it('should not display moon phase in central circle', () => {
+      const date = new Date(2026, 0, 10);
+      selectDate(date);
+
+      const centerTexts = Array.from(mockSvg.querySelectorAll('.center-text'));
+      const allText = centerTexts.map(el => el.textContent).join(' ');
+
+      // Should not contain moon phase names
+      const moonPhases = ['New Moon', 'Full Moon', 'Waxing Crescent', 'Waning Crescent', 
+                         'First Quarter', 'Last Quarter', 'Waxing Gibbous', 'Waning Gibbous'];
+      
+      moonPhases.forEach(phase => {
+        expect(allText).not.toContain(phase);
+      });
+    });
+
+    it('should update tooltip when date changes', () => {
+      const date1 = new Date(2026, 0, 10);
+      selectDate(date1);
+
+      const moon = mockSvg.querySelector('.moon-icon');
+      expect(moon).not.toBeNull();
+
+      // Show tooltip
+      const mouseEnterEvent = new MouseEvent('mouseenter', { bubbles: true });
+      moon.dispatchEvent(mouseEnterEvent);
+      
+      let tooltip = mockSvg.querySelector('.moon-tooltip');
+      expect(tooltip).not.toBeNull();
+      const initialText = tooltip.textContent;
+
+      // Change date
+      const date2 = new Date(2026, 0, 15);
+      selectDate(date2);
+
+      // Tooltip should still be visible and updated
+      tooltip = mockSvg.querySelector('.moon-tooltip');
+      expect(tooltip).not.toBeNull();
+      expect(tooltip.textContent).not.toBe(initialText);
+      expect(tooltip.textContent).toContain('Lunar phase:');
+    });
+
+    it('should update tooltip position when moon moves', () => {
+      const date1 = new Date(2026, 0, 10);
+      selectDate(date1);
+
+      const moon = mockSvg.querySelector('.moon-icon');
+      expect(moon).not.toBeNull();
+
+      // Show tooltip
+      const mouseEnterEvent = new MouseEvent('mouseenter', { bubbles: true });
+      moon.dispatchEvent(mouseEnterEvent);
+      
+      let tooltip = mockSvg.querySelector('.moon-tooltip');
+      expect(tooltip).not.toBeNull();
+      const initialX = tooltip.getAttribute('x');
+      const initialY = tooltip.getAttribute('y');
+
+      // Change date (which moves the moon)
+      const date2 = new Date(2026, 0, 20);
+      selectDate(date2);
+
+      // Tooltip position should be updated
+      tooltip = mockSvg.querySelector('.moon-tooltip');
+      expect(tooltip).not.toBeNull();
+      // Position should have changed (moon moved)
+      const newX = tooltip.getAttribute('x');
+      const newY = tooltip.getAttribute('y');
+      // At least one coordinate should be different
+      expect(newX !== initialX || newY !== initialY).toBe(true);
+    });
+
+    it('should keep tooltip within SVG bounds when moon is near left edge', () => {
+      // Select a date that positions moon near the left edge
+      // January 1st should position moon near the left
+      const date = new Date(2026, 0, 1);
+      selectDate(date);
+
+      const moon = mockSvg.querySelector('.moon-icon');
+      expect(moon).not.toBeNull();
+
+      // Show tooltip
+      const mouseEnterEvent = new MouseEvent('mouseenter', { bubbles: true });
+      moon.dispatchEvent(mouseEnterEvent);
+      
+      const tooltipBg = mockSvg.querySelector('.moon-tooltip-bg');
+      expect(tooltipBg).not.toBeNull();
+      
+      const bgX = parseFloat(tooltipBg.getAttribute('x'));
+      const bgWidth = parseFloat(tooltipBg.getAttribute('width'));
+      
+      // Tooltip should be within bounds (with margin)
+      expect(bgX).toBeGreaterThanOrEqual(5);
+      expect(bgX + bgWidth).toBeLessThanOrEqual(400 - 5);
+    });
+
+    it('should keep tooltip within SVG bounds when moon is near right edge', () => {
+      // Select a date that positions moon near the right edge
+      // December 31st should position moon near the right
+      const date = new Date(2026, 11, 31);
+      selectDate(date);
+
+      const moon = mockSvg.querySelector('.moon-icon');
+      expect(moon).not.toBeNull();
+
+      // Show tooltip
+      const mouseEnterEvent = new MouseEvent('mouseenter', { bubbles: true });
+      moon.dispatchEvent(mouseEnterEvent);
+      
+      const tooltipBg = mockSvg.querySelector('.moon-tooltip-bg');
+      expect(tooltipBg).not.toBeNull();
+      
+      const bgX = parseFloat(tooltipBg.getAttribute('x'));
+      const bgWidth = parseFloat(tooltipBg.getAttribute('width'));
+      
+      // Tooltip should be within bounds (with margin)
+      expect(bgX).toBeGreaterThanOrEqual(5);
+      expect(bgX + bgWidth).toBeLessThanOrEqual(400 - 5);
+    });
+
+    it('should keep tooltip within SVG bounds when moon is near top edge', () => {
+      // Select a date - tooltip should adjust if moon is too high
+      const date = new Date(2026, 0, 1);
+      selectDate(date);
+
+      const moon = mockSvg.querySelector('.moon-icon');
+      expect(moon).not.toBeNull();
+
+      // Show tooltip
+      const mouseEnterEvent = new MouseEvent('mouseenter', { bubbles: true });
+      moon.dispatchEvent(mouseEnterEvent);
+      
+      const tooltipBg = mockSvg.querySelector('.moon-tooltip-bg');
+      expect(tooltipBg).not.toBeNull();
+      
+      const bgY = parseFloat(tooltipBg.getAttribute('y'));
+      const bgHeight = parseFloat(tooltipBg.getAttribute('height'));
+      
+      // Tooltip should be within bounds (with margin)
+      expect(bgY).toBeGreaterThanOrEqual(5);
+      expect(bgY + bgHeight).toBeLessThanOrEqual(400 - 5);
+    });
+
+    it('should keep tooltip within SVG bounds when moon is near bottom edge', () => {
+      // Select a date - tooltip should adjust if moon is too low
+      const date = new Date(2026, 5, 15);
+      selectDate(date);
+
+      const moon = mockSvg.querySelector('.moon-icon');
+      expect(moon).not.toBeNull();
+
+      // Show tooltip
+      const mouseEnterEvent = new MouseEvent('mouseenter', { bubbles: true });
+      moon.dispatchEvent(mouseEnterEvent);
+      
+      const tooltipBg = mockSvg.querySelector('.moon-tooltip-bg');
+      expect(tooltipBg).not.toBeNull();
+      
+      const bgY = parseFloat(tooltipBg.getAttribute('y'));
+      const bgHeight = parseFloat(tooltipBg.getAttribute('height'));
+      
+      // Tooltip should be within bounds (with margin)
+      expect(bgY).toBeGreaterThanOrEqual(5);
+      expect(bgY + bgHeight).toBeLessThanOrEqual(400 - 5);
     });
   });
 });

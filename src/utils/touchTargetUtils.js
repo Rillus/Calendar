@@ -14,13 +14,36 @@ const MIN_TOUCH_TARGET_SIZE = 44;
  * @returns {Object} Measurement object with width, height, area, and meetsRequirement
  */
 export function measureTouchTarget(element) {
-  if (!element || typeof element.getBoundingClientRect !== 'function') {
+  if (!element) {
     throw new Error('Invalid element provided');
   }
 
-  const rect = element.getBoundingClientRect();
-  const width = rect.width;
-  const height = rect.height;
+  let width, height;
+
+  // For SVG elements, use getBBox() which works better in test environments
+  if (element.namespaceURI === 'http://www.w3.org/2000/svg' && typeof element.getBBox === 'function') {
+    try {
+      const bbox = element.getBBox();
+      width = bbox.width;
+      height = bbox.height;
+    } catch (e) {
+      // If getBBox fails (element not in DOM or not rendered), fall back to getBoundingClientRect
+      if (typeof element.getBoundingClientRect === 'function') {
+        const rect = element.getBoundingClientRect();
+        width = rect.width;
+        height = rect.height;
+      } else {
+        throw new Error('Element cannot be measured');
+      }
+    }
+  } else if (typeof element.getBoundingClientRect === 'function') {
+    const rect = element.getBoundingClientRect();
+    width = rect.width;
+    height = rect.height;
+  } else {
+    throw new Error('Invalid element provided - no measurement method available');
+  }
+
   const area = width * height;
   const meetsRequirement = width >= MIN_TOUCH_TARGET_SIZE && height >= MIN_TOUCH_TARGET_SIZE;
 
