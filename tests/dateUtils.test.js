@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isLeapYear, getDaysInMonth } from '../src/utils/dateUtils.js';
+import { isLeapYear, getDaysInMonth, formatDate, formatTime, formatDateWithTime } from '../src/utils/dateUtils.js';
 
 describe('dateUtils', () => {
   describe('isLeapYear', () => {
@@ -104,6 +104,133 @@ describe('dateUtils', () => {
     it('should handle February in century years correctly', () => {
       expect(getDaysInMonth(1, 1900)).toBe(28); // Not a leap year
       expect(getDaysInMonth(1, 2000)).toBe(29); // Leap year
+    });
+  });
+
+  describe('formatDate', () => {
+    it('should format date in British format (en-GB) by default', () => {
+      const date = new Date(2024, 0, 15); // 15 January 2024
+      const formatted = formatDate(date);
+      expect(formatted).toBe('15 January 2024');
+    });
+
+    it('should format date with different months correctly', () => {
+      const date1 = new Date(2024, 2, 20); // 20 March 2024
+      expect(formatDate(date1)).toBe('20 March 2024');
+
+      const date2 = new Date(2023, 11, 25); // 25 December 2023
+      expect(formatDate(date2)).toBe('25 December 2023');
+    });
+
+    it('should handle single-digit days correctly', () => {
+      const date = new Date(2024, 5, 5); // 5 June 2024
+      expect(formatDate(date)).toBe('5 June 2024');
+    });
+
+    it('should use specified locale when provided', () => {
+      const date = new Date(2024, 0, 15); // 15 January 2024
+      const formatted = formatDate(date, { locale: 'en-US' });
+      // US format typically uses "January 15, 2024"
+      expect(formatted).toContain('January');
+      expect(formatted).toContain('2024');
+    });
+
+    it('should handle leap year dates correctly', () => {
+      const date = new Date(2024, 1, 29); // 29 February 2024 (leap year)
+      expect(formatDate(date)).toBe('29 February 2024');
+    });
+  });
+
+  describe('formatTime', () => {
+    it('should format time in 12-hour format by default', () => {
+      const date = new Date(2024, 0, 15, 14, 30); // 2:30 PM
+      const formatted = formatTime(date);
+      expect(formatted).toBe('2:30 PM');
+    });
+
+    it('should format midnight correctly in 12-hour format', () => {
+      const date = new Date(2024, 0, 15, 0, 0); // 12:00 AM
+      const formatted = formatTime(date, { use12Hour: true });
+      expect(formatted).toBe('12:00 AM');
+    });
+
+    it('should format noon correctly in 12-hour format', () => {
+      const date = new Date(2024, 0, 15, 12, 0); // 12:00 PM
+      const formatted = formatTime(date, { use12Hour: true });
+      expect(formatted).toBe('12:00 PM');
+    });
+
+    it('should format morning hours correctly in 12-hour format', () => {
+      const date = new Date(2024, 0, 15, 9, 15); // 9:15 AM
+      const formatted = formatTime(date, { use12Hour: true });
+      expect(formatted).toBe('9:15 AM');
+    });
+
+    it('should format afternoon hours correctly in 12-hour format', () => {
+      const date = new Date(2024, 0, 15, 15, 45); // 3:45 PM
+      const formatted = formatTime(date, { use12Hour: true });
+      expect(formatted).toBe('3:45 PM');
+    });
+
+    it('should format time in 24-hour format when use12Hour is false', () => {
+      const date = new Date(2024, 0, 15, 14, 30); // 14:30
+      const formatted = formatTime(date, { use12Hour: false });
+      expect(formatted).toBe('14:30');
+    });
+
+    it('should format midnight correctly in 24-hour format', () => {
+      const date = new Date(2024, 0, 15, 0, 0); // 00:00
+      const formatted = formatTime(date, { use12Hour: false });
+      expect(formatted).toBe('00:00');
+    });
+
+    it('should format noon correctly in 24-hour format', () => {
+      const date = new Date(2024, 0, 15, 12, 0); // 12:00
+      const formatted = formatTime(date, { use12Hour: false });
+      expect(formatted).toBe('12:00');
+    });
+
+    it('should pad minutes with zero when needed', () => {
+      const date = new Date(2024, 0, 15, 14, 5); // 14:05
+      const formatted24 = formatTime(date, { use12Hour: false });
+      expect(formatted24).toBe('14:05');
+      
+      const formatted12 = formatTime(date, { use12Hour: true });
+      expect(formatted12).toBe('2:05 PM');
+    });
+  });
+
+  describe('formatDateWithTime', () => {
+    it('should combine date and time in 12-hour format', () => {
+      const date = new Date(2024, 0, 15, 14, 30); // 15 January 2024, 2:30 PM
+      const formatted = formatDateWithTime(date, { use12Hour: true });
+      expect(formatted).toBe('15 January 2024, 2:30 PM');
+    });
+
+    it('should combine date and time in 24-hour format', () => {
+      const date = new Date(2024, 0, 15, 14, 30); // 15 January 2024, 14:30
+      const formatted = formatDateWithTime(date, { use12Hour: false });
+      expect(formatted).toBe('15 January 2024, 14:30');
+    });
+
+    it('should use 12-hour format by default', () => {
+      const date = new Date(2024, 0, 15, 14, 30);
+      const formatted = formatDateWithTime(date);
+      expect(formatted).toBe('15 January 2024, 2:30 PM');
+    });
+
+    it('should handle dates without time component (midnight)', () => {
+      const date = new Date(2024, 0, 15, 0, 0);
+      const formatted = formatDateWithTime(date, { use12Hour: true });
+      expect(formatted).toBe('15 January 2024, 12:00 AM');
+    });
+
+    it('should respect locale option for date formatting', () => {
+      const date = new Date(2024, 0, 15, 14, 30);
+      const formatted = formatDateWithTime(date, { locale: 'en-US', use12Hour: true });
+      // Should still contain the time
+      expect(formatted).toContain('PM');
+      expect(formatted).toContain('2024');
     });
   });
 });

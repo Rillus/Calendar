@@ -4,7 +4,8 @@ import {
   validateTime,
   isDateRestricted,
   formatDateForError,
-  createValidationOptions
+  createValidationOptions,
+  getRestrictionReason
 } from '../src/utils/dateValidation.js';
 
 describe('dateValidation', () => {
@@ -217,6 +218,193 @@ describe('dateValidation', () => {
       
       const result = isDateRestricted(date, { minDate, maxDate });
       expect(result).toBe(false);
+    });
+
+    it('should return true for date in disabledDates array', () => {
+      const date = new Date(2024, 5, 15);
+      const disabledDates = [
+        new Date(2024, 5, 15),
+        new Date(2024, 5, 20)
+      ];
+      
+      const result = isDateRestricted(date, { disabledDates });
+      expect(result).toBe(true);
+    });
+
+    it('should return false for date not in disabledDates array', () => {
+      const date = new Date(2024, 5, 15);
+      const disabledDates = [
+        new Date(2024, 5, 20),
+        new Date(2024, 5, 25)
+      ];
+      
+      const result = isDateRestricted(date, { disabledDates });
+      expect(result).toBe(false);
+    });
+
+    it('should compare dates ignoring time when checking disabledDates', () => {
+      const date = new Date(2024, 5, 15, 10, 30, 0);
+      const disabledDate = new Date(2024, 5, 15, 14, 0, 0);
+      
+      const result = isDateRestricted(date, { disabledDates: [disabledDate] });
+      expect(result).toBe(true);
+    });
+
+    it('should return true for date within disabledRanges', () => {
+      const date = new Date(2024, 5, 15);
+      const disabledRanges = [
+        { start: new Date(2024, 5, 10), end: new Date(2024, 5, 20) }
+      ];
+      
+      const result = isDateRestricted(date, { disabledRanges });
+      expect(result).toBe(true);
+    });
+
+    it('should return true for date on start of disabledRange', () => {
+      const date = new Date(2024, 5, 10);
+      const disabledRanges = [
+        { start: new Date(2024, 5, 10), end: new Date(2024, 5, 20) }
+      ];
+      
+      const result = isDateRestricted(date, { disabledRanges });
+      expect(result).toBe(true);
+    });
+
+    it('should return true for date on end of disabledRange', () => {
+      const date = new Date(2024, 5, 20);
+      const disabledRanges = [
+        { start: new Date(2024, 5, 10), end: new Date(2024, 5, 20) }
+      ];
+      
+      const result = isDateRestricted(date, { disabledRanges });
+      expect(result).toBe(true);
+    });
+
+    it('should return false for date outside disabledRanges', () => {
+      const date = new Date(2024, 5, 25);
+      const disabledRanges = [
+        { start: new Date(2024, 5, 10), end: new Date(2024, 5, 20) }
+      ];
+      
+      const result = isDateRestricted(date, { disabledRanges });
+      expect(result).toBe(false);
+    });
+
+    it('should handle multiple disabledRanges', () => {
+      const date = new Date(2024, 5, 15);
+      const disabledRanges = [
+        { start: new Date(2024, 5, 1), end: new Date(2024, 5, 5) },
+        { start: new Date(2024, 5, 10), end: new Date(2024, 5, 20) }
+      ];
+      
+      const result = isDateRestricted(date, { disabledRanges });
+      expect(result).toBe(true);
+    });
+
+    it('should handle empty disabledDates array', () => {
+      const date = new Date(2024, 5, 15);
+      const result = isDateRestricted(date, { disabledDates: [] });
+      expect(result).toBe(false);
+    });
+
+    it('should handle empty disabledRanges array', () => {
+      const date = new Date(2024, 5, 15);
+      const result = isDateRestricted(date, { disabledRanges: [] });
+      expect(result).toBe(false);
+    });
+
+    it('should combine multiple restriction types', () => {
+      const date = new Date(2024, 5, 15);
+      const minDate = new Date(2024, 5, 10);
+      const maxDate = new Date(2024, 5, 20);
+      const disabledDates = [new Date(2024, 5, 12)];
+      const disabledRanges = [{ start: new Date(2024, 5, 18), end: new Date(2024, 5, 19) }];
+      
+      // Date is within range but not in disabledDates or disabledRanges
+      expect(isDateRestricted(date, { minDate, maxDate, disabledDates, disabledRanges })).toBe(false);
+      
+      // Date is in disabledDates
+      expect(isDateRestricted(new Date(2024, 5, 12), { minDate, maxDate, disabledDates, disabledRanges })).toBe(true);
+      
+      // Date is in disabledRanges
+      expect(isDateRestricted(new Date(2024, 5, 18), { minDate, maxDate, disabledDates, disabledRanges })).toBe(true);
+    });
+
+    it('should handle leap year dates correctly', () => {
+      const leapYearDate = new Date(2024, 1, 29); // Feb 29, 2024 (leap year)
+      const disabledDates = [new Date(2024, 1, 29)];
+      
+      const result = isDateRestricted(leapYearDate, { disabledDates });
+      expect(result).toBe(true);
+    });
+
+    it('should handle month boundaries in disabledRanges', () => {
+      const date = new Date(2024, 4, 31); // May 31
+      const disabledRanges = [
+        { start: new Date(2024, 4, 30), end: new Date(2024, 5, 2) } // May 30 - June 2
+      ];
+      
+      const result = isDateRestricted(date, { disabledRanges });
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('getRestrictionReason', () => {
+    it('should return undefined for unrestricted date', () => {
+      const date = new Date(2024, 5, 15);
+      const reason = getRestrictionReason(date);
+      expect(reason).toBeUndefined();
+    });
+
+    it('should return reason for past date when allowPast is false', () => {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      const reason = getRestrictionReason(yesterday, { allowPast: false });
+      expect(reason).toContain('Past dates are not allowed');
+    });
+
+    it('should return reason for date before minDate', () => {
+      const date = new Date(2024, 5, 15);
+      const minDate = new Date(2024, 5, 20);
+      
+      const reason = getRestrictionReason(date, { minDate });
+      expect(reason).toContain('must be after');
+    });
+
+    it('should return reason for date after maxDate', () => {
+      const date = new Date(2024, 5, 25);
+      const maxDate = new Date(2024, 5, 20);
+      
+      const reason = getRestrictionReason(date, { maxDate });
+      expect(reason).toContain('must be before');
+    });
+
+    it('should return reason for date in disabledDates', () => {
+      const date = new Date(2024, 5, 15);
+      const disabledDates = [new Date(2024, 5, 15)];
+      
+      const reason = getRestrictionReason(date, { disabledDates });
+      expect(reason).toContain('not available');
+    });
+
+    it('should return reason for date in disabledRanges', () => {
+      const date = new Date(2024, 5, 15);
+      const disabledRanges = [
+        { start: new Date(2024, 5, 10), end: new Date(2024, 5, 20) }
+      ];
+      
+      const reason = getRestrictionReason(date, { disabledRanges });
+      expect(reason).toContain('not available');
+    });
+
+    it('should prioritise past date reason over other restrictions', () => {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const disabledDates = [yesterday];
+      
+      const reason = getRestrictionReason(yesterday, { allowPast: false, disabledDates });
+      expect(reason).toContain('Past dates are not allowed');
     });
   });
 

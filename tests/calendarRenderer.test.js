@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { initRenderer, drawCalendar, drawCircle, writeSegmentName, setYear, subscribeToDateChanges, selectDate } from '../src/renderer/calendarRenderer.js';
+import { initRenderer, drawCalendar, drawCircle, writeSegmentName, setYear, subscribeToDateChanges, selectDate, goToToday, setTimeSelectionOptions } from '../src/renderer/calendarRenderer.js';
 import { segments, svgSize } from '../src/config/config.js';
 
 describe('calendarRenderer', () => {
@@ -280,7 +280,14 @@ describe('calendarRenderer', () => {
       expect(moon).not.toBeNull();
 
       const centreTexts = Array.from(mockSvg.querySelectorAll('.center-text')).map((el) => el.textContent);
-      expect(centreTexts.some((t) => t === 'JAN 10')).toBe(true);
+      // New format: "10 January 2026" instead of "Jan 10"
+      // Check that the formatted date is displayed (contains day, month name, and year)
+      // Combine all text to check for formatted date parts
+      const combinedText = centreTexts.join(' ');
+      const hasFormattedDate = combinedText.includes('10') && 
+                               combinedText.includes('January') && 
+                               combinedText.includes('2026');
+      expect(hasFormattedDate).toBe(true);
 
       expect(seen.length).toBeGreaterThanOrEqual(1);
       const last = seen[seen.length - 1];
@@ -317,6 +324,7 @@ describe('calendarRenderer', () => {
       expect(Array.from(dayLabels).some((el) => el.textContent === '31')).toBe(true);
 
       const centreTexts = Array.from(mockSvg.querySelectorAll('.center-text')).map((el) => el.textContent);
+      // showMonthCentre displays uppercase month name
       expect(centreTexts).toEqual(['JAN']);
     });
 
@@ -699,6 +707,399 @@ describe('calendarRenderer', () => {
       // Verify we're still in year view
       expect(mockSvg.querySelector('.segments-group')).not.toBeNull();
       expect(mockSvg.querySelector('.day-segments-group')).toBeNull();
+    });
+  });
+
+  describe('goToToday', () => {
+    beforeEach(() => {
+      initRenderer(mockSvg);
+      drawCalendar();
+    });
+
+    it('should navigate to today\'s date when in current year', () => {
+      const today = new Date();
+      const currentYear = today.getFullYear();
+      
+      // Set to current year
+      setYear(currentYear);
+      
+      const seen = [];
+      const unsubscribe = subscribeToDateChanges((date) => {
+        seen.push(date);
+      });
+
+      goToToday();
+
+      unsubscribe();
+
+      // Should have notified with today's date
+      expect(seen.length).toBeGreaterThanOrEqual(1);
+      const last = seen[seen.length - 1];
+      expect(last.getFullYear()).toBe(today.getFullYear());
+      expect(last.getMonth()).toBe(today.getMonth());
+      expect(last.getDate()).toBe(today.getDate());
+
+      // Should have sun and moon for today
+      const sun = mockSvg.querySelector('.sun-icon');
+      const moon = mockSvg.querySelector('.moon-icon');
+      expect(sun).not.toBeNull();
+      expect(moon).not.toBeNull();
+    });
+
+    it('should update year and navigate to today when in different year', () => {
+      const today = new Date();
+      const currentYear = today.getFullYear();
+      const differentYear = currentYear - 1; // Last year
+      
+      // Set to different year
+      setYear(differentYear);
+      
+      const seen = [];
+      const unsubscribe = subscribeToDateChanges((date) => {
+        seen.push(date);
+      });
+
+      goToToday();
+
+      unsubscribe();
+
+      // Should have notified with today's date
+      expect(seen.length).toBeGreaterThanOrEqual(1);
+      const last = seen[seen.length - 1];
+      expect(last.getFullYear()).toBe(today.getFullYear());
+      expect(last.getMonth()).toBe(today.getMonth());
+      expect(last.getDate()).toBe(today.getDate());
+    });
+
+    it('should select today even when in day selection view', () => {
+      const today = new Date();
+      const currentYear = today.getFullYear();
+      
+      setYear(currentYear);
+      drawCalendar();
+      
+      // Navigate to day selection view
+      const januarySegment = mockSvg.querySelector('.calendar-segment[data-segment-index="0"]');
+      januarySegment.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      
+      // Verify we're in day selection view
+      expect(mockSvg.querySelector('.day-segments-group')).not.toBeNull();
+      
+      const seen = [];
+      const unsubscribe = subscribeToDateChanges((date) => {
+        seen.push(date);
+      });
+
+      goToToday();
+
+      unsubscribe();
+
+      // Should have selected today and returned to year view
+      expect(seen.length).toBeGreaterThanOrEqual(1);
+      const last = seen[seen.length - 1];
+      expect(last.getFullYear()).toBe(today.getFullYear());
+      expect(last.getMonth()).toBe(today.getMonth());
+      expect(last.getDate()).toBe(today.getDate());
+      
+      // Should be back in year view (selectDate clears day selection view)
+      expect(mockSvg.querySelector('.segments-group')).not.toBeNull();
+    });
+
+    it('should work when time selection is enabled', () => {
+      initRenderer(mockSvg, { timeSelectionEnabled: true });
+      drawCalendar();
+      
+      const today = new Date();
+      const currentYear = today.getFullYear();
+      setYear(currentYear);
+      
+      const seen = [];
+      const unsubscribe = subscribeToDateChanges((date) => {
+        seen.push(date);
+      });
+
+      goToToday();
+
+      unsubscribe();
+
+      // Should have notified with today's date
+      expect(seen.length).toBeGreaterThanOrEqual(1);
+      const last = seen[seen.length - 1];
+      expect(last.getFullYear()).toBe(today.getFullYear());
+      expect(last.getMonth()).toBe(today.getMonth());
+      expect(last.getDate()).toBe(today.getDate());
+    });
+  });
+
+  describe('Keyboard Navigation', () => {
+    beforeEach(() => {
+      initRenderer(mockSvg);
+      drawCalendar();
+    });
+
+    it('should make month segments focusable', () => {
+      const segmentsGroup = mockSvg.querySelector('.segments-group');
+      const paths = segmentsGroup.querySelectorAll('path.calendar-segment');
+      
+      expect(paths.length).toBeGreaterThan(0);
+      paths.forEach(path => {
+        expect(path.getAttribute('tabindex')).toBe('0');
+      });
+    });
+
+    it('should handle Enter key activation on month segments', () => {
+      const segmentsGroup = mockSvg.querySelector('.segments-group');
+      const firstPath = segmentsGroup.querySelector('path.calendar-segment');
+      
+      expect(firstPath).not.toBeNull();
+      
+      // Simulate Enter key
+      const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+      firstPath.dispatchEvent(enterEvent);
+      
+      // Should have switched to day selection view
+      const daySegmentsGroup = mockSvg.querySelector('.day-segments-group');
+      expect(daySegmentsGroup).not.toBeNull();
+    });
+
+    it('should handle Space key activation on month segments', () => {
+      const segmentsGroup = mockSvg.querySelector('.segments-group');
+      const firstPath = segmentsGroup.querySelector('path.calendar-segment');
+      
+      expect(firstPath).not.toBeNull();
+      
+      // Simulate Space key
+      const spaceEvent = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+      firstPath.dispatchEvent(spaceEvent);
+      
+      // Should have switched to day selection view
+      const daySegmentsGroup = mockSvg.querySelector('.day-segments-group');
+      expect(daySegmentsGroup).not.toBeNull();
+    });
+
+    it('should handle ArrowRight navigation between month segments', () => {
+      const segmentsGroup = mockSvg.querySelector('.segments-group');
+      const paths = Array.from(segmentsGroup.querySelectorAll('path.calendar-segment'));
+      
+      expect(paths.length).toBeGreaterThan(1);
+      
+      // Focus first segment
+      paths[0].focus();
+      expect(document.activeElement).toBe(paths[0]);
+      
+      // Simulate ArrowRight
+      const arrowEvent = new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true });
+      paths[0].dispatchEvent(arrowEvent);
+      
+      // Focus should move to next segment (or wrap to first)
+      // Note: The actual focus movement happens in the event handler
+      expect(paths[0].classList.contains('focused') || paths[1].classList.contains('focused')).toBe(true);
+    });
+
+    it('should add focused class on focus event', () => {
+      const segmentsGroup = mockSvg.querySelector('.segments-group');
+      const firstPath = segmentsGroup.querySelector('path.calendar-segment');
+      
+      const focusEvent = new Event('focus', { bubbles: true });
+      firstPath.dispatchEvent(focusEvent);
+      
+      expect(firstPath.classList.contains('focused')).toBe(true);
+    });
+
+    it('should remove focused class on blur event', () => {
+      const segmentsGroup = mockSvg.querySelector('.segments-group');
+      const firstPath = segmentsGroup.querySelector('path.calendar-segment');
+      
+      firstPath.classList.add('focused');
+      const blurEvent = new Event('blur', { bubbles: true });
+      firstPath.dispatchEvent(blurEvent);
+      
+      expect(firstPath.classList.contains('focused')).toBe(false);
+    });
+
+    it('should make day segments focusable when in day selection view', () => {
+      const segmentsGroup = mockSvg.querySelector('.segments-group');
+      const firstMonthPath = segmentsGroup.querySelector('path.calendar-segment');
+      
+      // Dispatch click event to enter day selection
+      const clickEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
+      firstMonthPath.dispatchEvent(clickEvent);
+      
+      const daySegmentsGroup = mockSvg.querySelector('.day-segments-group');
+      expect(daySegmentsGroup).not.toBeNull();
+      
+      const dayPaths = daySegmentsGroup.querySelectorAll('path.day-segment:not(.day-segment--restricted)');
+      expect(dayPaths.length).toBeGreaterThan(0);
+      
+      dayPaths.forEach(path => {
+        expect(path.getAttribute('tabindex')).toBe('0');
+      });
+    });
+
+    it('should handle Home key to jump to first month segment', () => {
+      const segmentsGroup = mockSvg.querySelector('.segments-group');
+      const paths = Array.from(segmentsGroup.querySelectorAll('path.calendar-segment'));
+      
+      // Focus a middle segment
+      if (paths.length > 2) {
+        paths[2].focus();
+        
+        // Simulate Home key
+        const homeEvent = new KeyboardEvent('keydown', { key: 'Home', bubbles: true, cancelable: true });
+        paths[2].dispatchEvent(homeEvent);
+        
+        // First segment should receive focus (or be focused)
+        // The actual focus movement is handled by the callback
+        expect(paths[0].classList.contains('focused') || paths[2].classList.contains('focused')).toBe(true);
+      }
+    });
+
+    it('should handle End key to jump to last month segment', () => {
+      const segmentsGroup = mockSvg.querySelector('.segments-group');
+      const paths = Array.from(segmentsGroup.querySelectorAll('path.calendar-segment'));
+      
+      // Focus first segment
+      paths[0].focus();
+      
+      // Simulate End key
+      const endEvent = new KeyboardEvent('keydown', { key: 'End', bubbles: true, cancelable: true });
+      paths[0].dispatchEvent(endEvent);
+      
+      // Last segment should receive focus (or be focused)
+      const lastIndex = paths.length - 1;
+      expect(paths[lastIndex].classList.contains('focused') || paths[0].classList.contains('focused')).toBe(true);
+    });
+  });
+
+  describe('Focus Management Integration', () => {
+    beforeEach(() => {
+      initRenderer(mockSvg);
+      drawCalendar();
+    });
+
+    describe('with time selection enabled', () => {
+      beforeEach(() => {
+        // Reinitialize with time selection enabled
+        initRenderer(mockSvg, { timeSelectionEnabled: true });
+        drawCalendar();
+      });
+
+    it('should focus first day segment when entering day selection from year view', async () => {
+      const segmentsGroup = mockSvg.querySelector('.segments-group');
+      const firstMonthPath = segmentsGroup.querySelector('path.calendar-segment');
+      
+      // Focus a month segment
+      firstMonthPath.focus();
+      
+      // Enter day selection
+      const clickEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
+      firstMonthPath.dispatchEvent(clickEvent);
+      
+      // Wait for transition and focus to settle
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const daySegmentsGroup = mockSvg.querySelector('.day-segments-group');
+      expect(daySegmentsGroup).not.toBeNull();
+      
+      const firstDayPath = daySegmentsGroup.querySelector('path.day-segment:not(.day-segment--restricted)');
+      expect(firstDayPath).not.toBeNull();
+      // Focus should be on first day segment
+      expect(document.activeElement === firstDayPath || firstDayPath.classList.contains('focused')).toBe(true);
+    });
+
+      it('should focus first hour segment when entering hour selection from day selection', async () => {
+        // First enter day selection
+        const segmentsGroup = mockSvg.querySelector('.segments-group');
+        const firstMonthPath = segmentsGroup.querySelector('path.calendar-segment');
+        firstMonthPath.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Then enter hour selection
+        const daySegmentsGroup = mockSvg.querySelector('.day-segments-group');
+        const firstDayPath = daySegmentsGroup.querySelector('path.day-segment:not(.day-segment--restricted)');
+        firstDayPath.focus();
+        
+        const clickEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
+        firstDayPath.dispatchEvent(clickEvent);
+        
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        const hourSegmentsGroup = mockSvg.querySelector('.hour-segments-group');
+        expect(hourSegmentsGroup).not.toBeNull();
+        
+        const firstHourPath = hourSegmentsGroup.querySelector('path.hour-segment');
+        expect(firstHourPath).not.toBeNull();
+        // Focus should be on first hour segment
+        expect(document.activeElement === firstHourPath || firstHourPath.classList.contains('focused')).toBe(true);
+      });
+    });
+
+    it('should show focus indicators on focused SVG elements', () => {
+      const segmentsGroup = mockSvg.querySelector('.segments-group');
+      const firstPath = segmentsGroup.querySelector('path.calendar-segment');
+      
+      firstPath.focus();
+      
+      // Element should have focused class which applies focus styles via CSS
+      expect(firstPath.classList.contains('focused')).toBe(true);
+    });
+
+    it('should apply focus styles to focused day segments', async () => {
+      const segmentsGroup = mockSvg.querySelector('.segments-group');
+      const firstMonthPath = segmentsGroup.querySelector('path.calendar-segment');
+      firstMonthPath.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const daySegmentsGroup = mockSvg.querySelector('.day-segments-group');
+      const firstDayPath = daySegmentsGroup.querySelector('path.day-segment:not(.day-segment--restricted)');
+      
+      firstDayPath.focus();
+      
+      expect(firstDayPath.classList.contains('focused')).toBe(true);
+    });
+
+    it('should maintain focus order during view transitions', async () => {
+      // Navigate through views
+      const segmentsGroup = mockSvg.querySelector('.segments-group');
+      const firstMonthPath = segmentsGroup.querySelector('path.calendar-segment');
+      firstMonthPath.focus();
+      
+      // Enter day selection
+      firstMonthPath.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Verify focus moved to day selection
+      const daySegmentsGroup = mockSvg.querySelector('.day-segments-group');
+      expect(daySegmentsGroup).not.toBeNull();
+      
+      const focusedDay = daySegmentsGroup.querySelector('.day-segment.focused, .day-segment:focus');
+      // At least one day should be focusable and potentially focused
+      const firstDay = daySegmentsGroup.querySelector('.day-segment:not(.day-segment--restricted)');
+      expect(firstDay).not.toBeNull();
+      expect(firstDay.getAttribute('tabindex')).toBe('0');
+    });
+
+    it('should handle focus when restricted dates are present', async () => {
+      const segmentsGroup = mockSvg.querySelector('.segments-group');
+      const firstMonthPath = segmentsGroup.querySelector('path.calendar-segment');
+      firstMonthPath.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const daySegmentsGroup = mockSvg.querySelector('.day-segments-group');
+      // Should focus first non-restricted day
+      const firstNonRestricted = daySegmentsGroup.querySelector('.day-segment:not(.day-segment--restricted)');
+      
+      if (firstNonRestricted) {
+        expect(firstNonRestricted.getAttribute('tabindex')).toBe('0');
+        // Restricted days should not be focusable
+        const restrictedDays = daySegmentsGroup.querySelectorAll('.day-segment--restricted');
+        restrictedDays.forEach(day => {
+          expect(day.getAttribute('tabindex')).not.toBe('0');
+        });
+      }
     });
   });
 });

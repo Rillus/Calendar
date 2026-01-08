@@ -10,6 +10,7 @@
 	<div id="calendar-controls">
       <label for="year-input">Year:</label>
       <input type="number" id="year-input" min="1900" max="2100" value="2024">
+      <button id="today-button" type="button" aria-label="Go to today">Today</button>
       <label for="toggle-include-time">
         <input type="checkbox" id="toggle-include-time">
         Include time
@@ -18,6 +19,9 @@
         <input type="checkbox" id="toggle-12-hour">
         12-hour clock
       </label>
+      <button id="voice-toggle" type="button" aria-label="Start voice navigation">
+        <span id="voice-toggle-text">🎤 Voice</span>
+      </button>
     </div>
 	<div id="calendar-layout">
 	  <div id="calendar-container">

@@ -38,6 +38,39 @@ export const monthColorsHover = [
     [226, 115, 198]  // DEC - #e273c6 (light)
 ];
 
+// Dark mode colour palette - adapted for low-light environments
+// Colours are lighter/more vibrant to stand out against dark background
+export const monthColorsDark = [
+    [107, 123, 184],  // JAN - #6b7bb8 (lighter blue)
+    [71, 134, 214],   // FEB - #4786d6 (lighter blue)
+    [91, 168, 214],   // MAR - #5ba8d6 (lighter blue-green)
+    [131, 184, 169],  // APR - #83b8a9 (lighter green)
+    [175, 197, 90],   // MAY - #afc55a (lighter yellow-green)
+    [202, 219, 85],   // JUN - #cadb55 (lighter yellow-green)
+    [238, 225, 92],   // JUL - #eee15c (lighter yellow)
+    [246, 221, 88],   // AUG - #f6dd58 (lighter yellow)
+    [251, 204, 85],   // SEP - #fbcc55 (lighter orange-yellow)
+    [250, 152, 60],   // OCT - #fa983c (lighter orange)
+    [235, 114, 72],   // NOV - #eb7248 (lighter red-orange)
+    [183, 62, 152]    // DEC - #b73e98 (lighter magenta)
+];
+
+// Dark mode hover states
+export const monthColorsHoverDark = [
+    [127, 143, 204],  // JAN - #7f8fcc (lighter)
+    [91, 154, 234],   // FEB - #5b9aea (lighter)
+    [111, 188, 234],  // MAR - #6fbcea (lighter)
+    [151, 204, 189],  // APR - #97ccbd (lighter)
+    [195, 217, 110],  // MAY - #c3d96e (lighter)
+    [222, 239, 105],  // JUN - #deef69 (lighter)
+    [248, 235, 112],  // JUL - #f8eb70 (lighter)
+    [246, 231, 108],  // AUG - #f6e76c (lighter)
+    [251, 214, 105],  // SEP - #fbd669 (lighter)
+    [250, 172, 80],   // OCT - #faac50 (lighter)
+    [245, 134, 92],   // NOV - #f5865c (lighter)
+    [203, 82, 172]    // DEC - #cb52ac (lighter)
+];
+
 export const months = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
 export const monthDays = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 

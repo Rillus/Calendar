@@ -6,6 +6,8 @@ import {
   segments,
   monthColors,
   monthColorsHover,
+  monthColorsDark,
+  monthColorsHoverDark,
   months,
   deg,
   fullRadius,
@@ -18,6 +20,7 @@ import {
   padding
 } from '../config/config.js';
 import { rgbToHex } from '../utils/colorUtils.js';
+import { getThemeColor, getDarkMode } from '../utils/darkMode.js';
 import { degreesToRadians, sumTo, polarToCartesian } from '../utils/mathUtils.js';
 import { createArcPath, getMoonShadowDx } from '../utils/svgUtils.js';
 import { getDaysInMonth } from '../utils/dateUtils.js';
@@ -35,6 +38,16 @@ import {
   generateHourLabel,
   generateMinuteLabel
 } from '../utils/ariaUtils.js';
+import { setupSwipeGesture, cleanupSwipeGesture } from '../utils/touchGestures.js';
+import { transitionToView } from '../utils/viewTransitions.js';
+import {
+  makeSvgElementFocusable,
+  handleArrowKeyNavigation
+} from '../utils/keyboardNavigation.js';
+import {
+  manageFocusTransition,
+  focusFirstElement
+} from '../utils/focusManagement.js';
 
 // Full month names for announcements (better for screen readers)
 const fullMonthNames = [
@@ -50,6 +63,28 @@ const normaliseTwelveHourClock = (value) => {
   if (raw === '' || raw === 'false' || raw === '0') return false;
   if (raw === 'true' || raw === '1') return true;
   return false;
+};
+
+/**
+ * Get stroke color based on current theme
+ * @returns {string} Hex color for stroke
+ */
+const getStrokeColor = () => {
+  return getDarkMode() ? '#333' : '#fff';
+};
+
+/**
+ * Get CSS variable value or fallback
+ * @param {string} varName - CSS variable name
+ * @param {string} fallback - Fallback value
+ * @returns {string} CSS variable value or fallback
+ */
+const getCssVariable = (varName, fallback) => {
+  if (typeof window === 'undefined' || !window.getComputedStyle) {
+    return fallback;
+  }
+  const value = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  return value || fallback;
 };
 
 export function createCalendarRenderer(svgElement, options = {}) {
@@ -162,6 +197,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
         return; // Already at root (year view)
       }
 
+      const currentViewName = viewStateManager.getCurrentView();
       const previousView = viewStateManager.popView();
       
       // Set flag to prevent pushing views during restore
@@ -172,18 +208,27 @@ export function createCalendarRenderer(svgElement, options = {}) {
           case 'year':
             drawCalendar();
             drawCircle();
+            // Restore focus to saved year view focus (if any)
+            setTimeout(() => {
+              manageFocusTransition(currentViewName, 'year', {
+                restoreFromView: 'year'
+              });
+            }, 0);
             break;
           case 'monthDays':
             // Return to day selection for that month (without pushing to stack)
             showMonthDaySelection(previousView.context.monthIndex, true);
+            // Focus will be restored in showMonthDaySelection
             break;
           case 'hours':
             // Return to hour selection (without pushing to stack)
             showHourSelection(true);
+            // Focus will be restored in showHourSelection
             break;
           case 'minutes':
             // Return to minute selection (without pushing to stack)
             showMinuteSelection(true);
+            // Focus will be restored in showMinuteSelection
             break;
           default:
             // Unknown view, fall back to year view
@@ -216,114 +261,152 @@ export function createCalendarRenderer(svgElement, options = {}) {
     // Reset view state to year (root)
     viewStateManager.viewStack = [];
 
-    const segmentsGroup = svg.querySelector('.segments-group');
-    if (segmentsGroup) {
-      segmentsGroup.remove();
-    }
-
+    // Get current view group (could be any view type)
+    const currentViewGroup = svg.querySelector('.segments-group, .day-segments-group, .hour-segments-group, .minute-segments-group');
+    
+    // Create new segments group
     const segmentsGroupEl = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     segmentsGroupEl.setAttribute('class', 'segments-group');
     setAriaRole(segmentsGroupEl, 'group');
 
-    data.length = 0;
-    labels.length = 0;
-    colours.length = 0;
+    // Render function that builds the year view
+    const renderYearView = () => {
+      data.length = 0;
+      labels.length = 0;
+      colours.length = 0;
 
-    for (let i = 0; i < segments; i++) {
-      const monthColor = monthColors[i];
-      const monthColorHover = monthColorsHover[i];
-      const newColourHex = rgbToHex(monthColor);
-      const hoverColourHex = rgbToHex(monthColorHover);
+      for (let i = 0; i < segments; i++) {
+        const monthColor = getThemeColor(monthColors[i], monthColorsDark[i]);
+        const monthColorHover = getThemeColor(monthColorsHover[i], monthColorsHoverDark[i]);
+        const newColourHex = rgbToHex(monthColor);
+        const hoverColourHex = rgbToHex(monthColorHover);
 
-      data.push(deg);
-      colours.push(newColourHex);
-      labels.push(months[i]);
+        data.push(deg);
+        colours.push(newColourHex);
+        labels.push(months[i]);
 
-      const days = getDaysInMonth(i, currentYear);
-      let outerRadiusRatio;
-      if (days === 31) {
-        outerRadiusRatio = fullRadius;
-      } else if (days === 28) {
-        outerRadiusRatio = notchedRadiusFeb;
-      } else if (days === 29) {
-        outerRadiusRatio = notchedRadiusFebLeap;
-      } else {
-        outerRadiusRatio = notchedRadius30;
+        const days = getDaysInMonth(i, currentYear);
+        let outerRadiusRatio;
+        if (days === 31) {
+          outerRadiusRatio = fullRadius;
+        } else if (days === 28) {
+          outerRadiusRatio = notchedRadiusFeb;
+        } else if (days === 29) {
+          outerRadiusRatio = notchedRadiusFebLeap;
+        } else {
+          outerRadiusRatio = notchedRadius30;
+        }
+
+        const startingAngle = -degreesToRadians(sumTo(data, i)) + degreesToRadians(45);
+        const arcSize = degreesToRadians(data[i]);
+        const endingAngle = startingAngle + arcSize;
+
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', createArcPath(centerX, centerY, radius, startingAngle, endingAngle, outerRadiusRatio));
+        path.setAttribute('fill', newColourHex);
+        path.setAttribute('stroke', getStrokeColor());
+        path.setAttribute('stroke-width', '1');
+        path.setAttribute('data-segment-index', i);
+        path.setAttribute('class', 'calendar-segment');
+        path.setAttribute('data-base-color', newColourHex);
+        path.setAttribute('data-hover-color', hoverColourHex);
+        path.style.cursor = 'pointer';
+
+        // Add ARIA attributes
+        setAriaRole(path, 'button');
+        setAriaLabel(path, generateMonthLabel(i, currentYear));
+
+        path.addEventListener('mouseenter', (e) => {
+          e.target.setAttribute('fill', hoverColourHex);
+        });
+        path.addEventListener('mouseleave', (e) => {
+          e.target.setAttribute('fill', newColourHex);
+        });
+
+        path.addEventListener('click', (e) => {
+          e.preventDefault();
+          // Month tap/click switches to day selection view for that month.
+          showMonthDaySelection(i);
+        });
+
+        // Make keyboard accessible
+        makeSvgElementFocusable(path, {
+          onActivate: () => {
+            showMonthDaySelection(i);
+          },
+          onArrowKey: (direction) => {
+            const nextIndex = handleArrowKeyNavigation(direction, i, segments);
+            const nextPath = segmentsGroupEl.querySelector(`[data-segment-index="${nextIndex}"]`);
+            if (nextPath) {
+              nextPath.focus();
+            }
+          },
+          onHome: () => {
+            const firstPath = segmentsGroupEl.querySelector('[data-segment-index="0"]');
+            if (firstPath) {
+              firstPath.focus();
+            }
+          },
+          onEnd: () => {
+            const lastPath = segmentsGroupEl.querySelector(`[data-segment-index="${segments - 1}"]`);
+            if (lastPath) {
+              lastPath.focus();
+            }
+          }
+        });
+
+        segmentsGroupEl.appendChild(path);
+
+        const labelAngle = -degreesToRadians(sumTo(data, i)) + degreesToRadians(45) + (arcSize / 2);
+        const labelRadius = radius * outerRadiusRatio * 0.95;
+        const labelPos = polarToCartesian(centerX, centerY, labelRadius, labelAngle);
+
+        let textRotation = (labelAngle * 180 / Math.PI) + 90;
+        if (labelAngle > Math.PI / 2 && labelAngle < 3 * Math.PI / 2) {
+          textRotation += 180;
+        }
+
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', labelPos[0]);
+        text.setAttribute('y', labelPos[1]);
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('dominant-baseline', 'middle');
+        text.setAttribute('transform', `rotate(${textRotation} ${labelPos[0]} ${labelPos[1]})`);
+        text.setAttribute('class', 'segment-label');
+        text.setAttribute('data-segment-index', i);
+        text.textContent = labels[i];
+        text.style.fontSize = `${svgSize / 35}px`;
+        text.style.fontFamily = 'Helvetica, Arial, sans-serif';
+        text.style.fontWeight = 'bold';
+        text.style.pointerEvents = 'none';
+
+        if (i >= 3 && i <= 9) {
+          text.style.fill = getCssVariable('--svg-center-text-main', '#000');
+        } else {
+          text.style.fill = '#fff';
+          text.style.filter = 'drop-shadow(0px 0px 5px rgba(255, 255, 255, 0.2))';
+        }
+
+        segmentsGroupEl.appendChild(text);
       }
 
-      const startingAngle = -degreesToRadians(sumTo(data, i)) + degreesToRadians(45);
-      const arcSize = degreesToRadians(data[i]);
-      const endingAngle = startingAngle + arcSize;
+      svg.appendChild(segmentsGroupEl);
+      announceToScreenReader(`Year view, ${currentYear}`, svg);
+    };
 
-      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path.setAttribute('d', createArcPath(centerX, centerY, radius, startingAngle, endingAngle, outerRadiusRatio));
-      path.setAttribute('fill', newColourHex);
-      path.setAttribute('stroke', '#fff');
-      path.setAttribute('stroke-width', '1');
-      path.setAttribute('data-segment-index', i);
-      path.setAttribute('class', 'calendar-segment');
-      path.setAttribute('data-base-color', newColourHex);
-      path.setAttribute('data-hover-color', hoverColourHex);
-      path.style.cursor = 'pointer';
-
-      // Add ARIA attributes
-      setAriaRole(path, 'button');
-      setAriaLabel(path, generateMonthLabel(i, currentYear));
-
-      path.addEventListener('mouseenter', (e) => {
-        e.target.setAttribute('fill', hoverColourHex);
-      });
-      path.addEventListener('mouseleave', (e) => {
-        e.target.setAttribute('fill', newColourHex);
-      });
-
-      path.addEventListener('click', (e) => {
-        e.preventDefault();
-        // Month tap/click switches to day selection view for that month.
-        showMonthDaySelection(i);
-      });
-
-      segmentsGroupEl.appendChild(path);
-
-      const labelAngle = -degreesToRadians(sumTo(data, i)) + degreesToRadians(45) + (arcSize / 2);
-      const labelRadius = radius * outerRadiusRatio * 0.95;
-      const labelPos = polarToCartesian(centerX, centerY, labelRadius, labelAngle);
-
-      let textRotation = (labelAngle * 180 / Math.PI) + 90;
-      if (labelAngle > Math.PI / 2 && labelAngle < 3 * Math.PI / 2) {
-        textRotation += 180;
-      }
-
-      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      text.setAttribute('x', labelPos[0]);
-      text.setAttribute('y', labelPos[1]);
-      text.setAttribute('text-anchor', 'middle');
-      text.setAttribute('dominant-baseline', 'middle');
-      text.setAttribute('transform', `rotate(${textRotation} ${labelPos[0]} ${labelPos[1]})`);
-      text.setAttribute('class', 'segment-label');
-      text.setAttribute('data-segment-index', i);
-      text.textContent = labels[i];
-      text.style.fontSize = `${svgSize / 35}px`;
-      text.style.fontFamily = 'Helvetica, Arial, sans-serif';
-      text.style.fontWeight = 'bold';
-      text.style.pointerEvents = 'none';
-
-      if (i >= 3 && i <= 9) {
-        text.style.fill = '#000';
-      } else {
-        text.style.fill = '#fff';
-        text.style.filter = 'drop-shadow(0px 0px 5px rgba(255, 255, 255, 0.2))';
-      }
-
-      segmentsGroupEl.appendChild(text);
+    // Use transition if there's a current view, otherwise render directly
+    if (currentViewGroup) {
+      transitionToView(currentViewGroup, segmentsGroupEl, svg, 'backward', renderYearView);
+    } else {
+      renderYearView();
+      // Add entered class for initial render
+      segmentsGroupEl.classList.add('entered');
     }
-
-    svg.appendChild(segmentsGroupEl);
-    announceToScreenReader(`Year view, ${currentYear}`, svg);
   };
 
   const showMonthCentre = (monthIndex) => {
-    const monthColourHex = rgbToHex(monthColors[monthIndex]);
+    const monthColour = getThemeColor(monthColors[monthIndex], monthColorsDark[monthIndex]);
+    const monthColourHex = rgbToHex(monthColour);
 
     removeIfPresent('.center-circle');
     removeAllIfPresent('.center-text');
@@ -352,10 +435,6 @@ export function createCalendarRenderer(svgElement, options = {}) {
   };
 
   const showMonthDaySelection = (monthIndex, skipStatePush = false) => {
-    clearYearView();
-    clearDaySelectionView();
-    clearTimeSelectionView();
-
     activeView = 'monthDays';
     activeMonthIndex = monthIndex;
     // Track view state (unless we're restoring from Escape)
@@ -363,114 +442,207 @@ export function createCalendarRenderer(svgElement, options = {}) {
       viewStateManager.pushView('monthDays', { monthIndex });
     }
 
+    // Get current view group
+    const currentViewGroup = svg.querySelector('.segments-group, .day-segments-group, .hour-segments-group, .minute-segments-group');
+    
+    // Clear other views (but not the one we're transitioning from)
+    if (currentViewGroup) {
+      if (currentViewGroup.classList.contains('segments-group')) {
+        clearDaySelectionView();
+        clearTimeSelectionView();
+      } else if (currentViewGroup.classList.contains('day-segments-group')) {
+        clearTimeSelectionView();
+      }
+    } else {
+      clearYearView();
+      clearDaySelectionView();
+      clearTimeSelectionView();
+    }
+
     const days = getDaysInMonth(monthIndex, currentYear);
-    const monthColourHex = rgbToHex(monthColors[monthIndex]);
-    const dayLabelColour = (monthIndex >= 3 && monthIndex <= 9) ? '#000' : '#fff';
+    const monthColour = getThemeColor(monthColors[monthIndex], monthColorsDark[monthIndex]);
+    const monthColourHex = rgbToHex(monthColour);
+    const dayLabelColour = (monthIndex >= 3 && monthIndex <= 9) ? getCssVariable('--svg-center-text-main', '#000') : '#fff';
 
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     group.setAttribute('class', 'day-segments-group');
     group.setAttribute('data-month-index', String(monthIndex));
     setAriaRole(group, 'group');
 
-    const degreesPerDay = 360 / days;
-    for (let i = 0; i < days; i++) {
-      const day = i + 1;
-      const startingAngle = -degreesToRadians(degreesPerDay * i) + degreesToRadians(45);
-      const arcSize = degreesToRadians(degreesPerDay);
-      const endingAngle = startingAngle + arcSize;
+    // Render function that builds the day selection view
+    const renderDaySelectionView = () => {
+      const degreesPerDay = 360 / days;
+      for (let i = 0; i < days; i++) {
+        const day = i + 1;
+        const startingAngle = -degreesToRadians(degreesPerDay * i) + degreesToRadians(45);
+        const arcSize = degreesToRadians(degreesPerDay);
+        const endingAngle = startingAngle + arcSize;
 
-      const dateForDay = new Date(currentYear, monthIndex, day);
-      const isRestricted = isDateRestricted(dateForDay, validationOptions);
+        const dateForDay = new Date(currentYear, monthIndex, day);
+        const isRestricted = isDateRestricted(dateForDay, validationOptions);
 
-      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path.setAttribute('d', createArcPath(centerX, centerY, radius, startingAngle, endingAngle, fullRadius));
-      
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', createArcPath(centerX, centerY, radius, startingAngle, endingAngle, fullRadius));
+        
       // Apply visual styling for restricted dates
       if (isRestricted) {
-        path.setAttribute('fill', '#cccccc');
+        path.setAttribute('fill', getCssVariable('--svg-restricted-fill', '#cccccc'));
         path.setAttribute('opacity', '0.5');
-        path.setAttribute('class', 'day-segment day-segment--restricted');
-        path.style.cursor = 'not-allowed';
-        path.setAttribute('aria-disabled', 'true');
-      } else {
-        path.setAttribute('fill', monthColourHex);
-        path.setAttribute('class', 'day-segment');
-        path.style.cursor = 'pointer';
-      }
-      
-      path.setAttribute('stroke', '#fff');
+          path.setAttribute('class', 'day-segment day-segment--restricted');
+          path.style.cursor = 'not-allowed';
+          path.setAttribute('aria-disabled', 'true');
+        } else {
+          path.setAttribute('fill', monthColourHex);
+          path.setAttribute('class', 'day-segment');
+          path.style.cursor = 'pointer';
+        }
+        
+      path.setAttribute('stroke', getStrokeColor());
       path.setAttribute('stroke-width', '1');
       path.setAttribute('data-day', String(day));
 
-      // Add ARIA attributes
-      setAriaRole(path, 'button');
-      const dayLabel = generateDayLabel(day, monthIndex, currentYear);
-      setAriaLabel(path, isRestricted ? `${dayLabel} (not available)` : dayLabel);
+        // Add ARIA attributes
+        setAriaRole(path, 'button');
+        const dayLabel = generateDayLabel(day, monthIndex, currentYear);
+        setAriaLabel(path, isRestricted ? `${dayLabel} (not available)` : dayLabel);
 
-      path.addEventListener('click', (e) => {
-        e.preventDefault();
-        
-        // Prevent selection of restricted dates
-        if (isRestricted) {
-          const validation = validateDate(dateForDay, validationOptions);
-          if (!validation.valid) {
-            showErrorMessage(validation.error);
+        const handleDayActivation = () => {
+          // Prevent selection of restricted dates
+          if (isRestricted) {
+            const validation = validateDate(dateForDay, validationOptions);
+            if (!validation.valid) {
+              showErrorMessage(validation.error);
+            }
+            return;
           }
-          return;
-        }
-        
-        const selected = new Date(currentYear, monthIndex, day);
-        if (timeSelectionEnabled) {
-          pendingDate = selected;
-          pendingMeridiem = 'AM';
-          pendingHour24 = 0;
-          clearDaySelectionView();
-          showHourSelection();
-          announceToScreenReader(`Selected ${fullMonthNames[monthIndex]} ${day}, ${currentYear}`, svg);
-          return;
+          
+          const selected = new Date(currentYear, monthIndex, day);
+          if (timeSelectionEnabled) {
+            pendingDate = selected;
+            pendingMeridiem = 'AM';
+            pendingHour24 = 0;
+            clearDaySelectionView();
+            showHourSelection();
+            announceToScreenReader(`Selected ${fullMonthNames[monthIndex]} ${day}, ${currentYear}`, svg);
+            return;
+          }
+
+          drawCalendar();
+          drawCircle();
+          selectDate(selected);
+        };
+
+        path.addEventListener('click', (e) => {
+          e.preventDefault();
+          handleDayActivation();
+        });
+
+        // Make keyboard accessible (only if not restricted)
+        if (!isRestricted) {
+          makeSvgElementFocusable(path, {
+            onActivate: handleDayActivation,
+            onArrowKey: (direction) => {
+              const nextDayIndex = handleArrowKeyNavigation(direction, i, days);
+              const nextPath = group.querySelector(`[data-day="${nextDayIndex + 1}"]`);
+              if (nextPath && !nextPath.classList.contains('day-segment--restricted')) {
+                nextPath.focus();
+              }
+            },
+            onHome: () => {
+              const firstPath = group.querySelector('[data-day="1"]');
+              if (firstPath && !firstPath.classList.contains('day-segment--restricted')) {
+                firstPath.focus();
+              }
+            },
+            onEnd: () => {
+              const lastPath = group.querySelector(`[data-day="${days}"]`);
+              if (lastPath && !lastPath.classList.contains('day-segment--restricted')) {
+                lastPath.focus();
+              }
+            }
+          });
         }
 
-        drawCalendar();
-        drawCircle();
-        selectDate(selected);
+        group.appendChild(path);
+
+        // Day number labels around the outside, similar to month labels.
+        const labelAngle = startingAngle + (arcSize / 2);
+        const labelRadius = radius * fullRadius * 0.95;
+        const labelPos = polarToCartesian(centerX, centerY, labelRadius, labelAngle);
+
+        let textRotation = (labelAngle * 180 / Math.PI) + 90;
+        if (labelAngle > Math.PI / 2 && labelAngle < 3 * Math.PI / 2) {
+          textRotation += 180;
+        }
+
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', labelPos[0]);
+        text.setAttribute('y', labelPos[1]);
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('dominant-baseline', 'middle');
+        text.setAttribute('transform', `rotate(${textRotation} ${labelPos[0]} ${labelPos[1]})`);
+        text.setAttribute('class', 'day-label');
+        text.setAttribute('data-day', String(day));
+        text.textContent = String(day);
+        text.style.fontSize = `${svgSize / 40}px`;
+        text.style.fontFamily = 'Helvetica, Arial, sans-serif';
+        text.style.fontWeight = 'bold';
+        text.style.pointerEvents = 'none';
+        text.style.fill = dayLabelColour;
+        if (dayLabelColour === '#fff') {
+          text.style.filter = 'drop-shadow(0px 0px 5px rgba(255, 255, 255, 0.2))';
+        }
+
+        group.appendChild(text);
+      }
+
+      svg.appendChild(group);
+      showMonthCentre(monthIndex);
+      announceToScreenReader(`Entering day selection for ${fullMonthNames[monthIndex]}, ${currentYear}`, svg);
+      
+      // Manage focus after rendering
+      setTimeout(() => {
+        if (isRestoringView) {
+          // Restore focus when going back
+          const restored = manageFocusTransition(null, 'monthDays', {
+            container: svg,
+            selector: '.day-segment:not(.day-segment--restricted)',
+            restoreFromView: 'monthDays'
+          });
+          if (!restored) {
+            // Fallback to first element if restore failed
+            const firstDayPath = group.querySelector('.day-segment:not(.day-segment--restricted)');
+            if (firstDayPath) {
+              firstDayPath.focus();
+            }
+          }
+        } else {
+          // Focus first day segment when going forward
+          const firstDayPath = group.querySelector('.day-segment:not(.day-segment--restricted)');
+          if (firstDayPath) {
+            firstDayPath.focus();
+          }
+        }
+      }, 0);
+    };
+
+    // Save current focus before transitioning (if going forward from year view)
+    const isComingFromYearView = currentViewGroup && currentViewGroup.classList.contains('segments-group');
+    if (!isRestoringView && isComingFromYearView) {
+      manageFocusTransition('year', 'monthDays', {
+        container: svg,
+        selector: '.day-segment:not(.day-segment--restricted)'
       });
-
-      group.appendChild(path);
-
-      // Day number labels around the outside, similar to month labels.
-      const labelAngle = startingAngle + (arcSize / 2);
-      const labelRadius = radius * fullRadius * 0.95;
-      const labelPos = polarToCartesian(centerX, centerY, labelRadius, labelAngle);
-
-      let textRotation = (labelAngle * 180 / Math.PI) + 90;
-      if (labelAngle > Math.PI / 2 && labelAngle < 3 * Math.PI / 2) {
-        textRotation += 180;
-      }
-
-      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      text.setAttribute('x', labelPos[0]);
-      text.setAttribute('y', labelPos[1]);
-      text.setAttribute('text-anchor', 'middle');
-      text.setAttribute('dominant-baseline', 'middle');
-      text.setAttribute('transform', `rotate(${textRotation} ${labelPos[0]} ${labelPos[1]})`);
-      text.setAttribute('class', 'day-label');
-      text.setAttribute('data-day', String(day));
-      text.textContent = String(day);
-      text.style.fontSize = `${svgSize / 40}px`;
-      text.style.fontFamily = 'Helvetica, Arial, sans-serif';
-      text.style.fontWeight = 'bold';
-      text.style.pointerEvents = 'none';
-      text.style.fill = dayLabelColour;
-      if (dayLabelColour === '#fff') {
-        text.style.filter = 'drop-shadow(0px 0px 5px rgba(255, 255, 255, 0.2))';
-      }
-
-      group.appendChild(text);
     }
 
-    svg.appendChild(group);
-    showMonthCentre(monthIndex);
-    announceToScreenReader(`Entering day selection for ${fullMonthNames[monthIndex]}, ${currentYear}`, svg);
+    // Use transition if there's a current view, otherwise render directly
+    if (currentViewGroup) {
+      transitionToView(currentViewGroup, group, svg, 'forward', renderDaySelectionView);
+    } else {
+      renderDaySelectionView();
+      // Add entered class for initial render
+      group.classList.add('entered');
+    }
   };
 
   const renderAmPmSelector = () => {
@@ -493,7 +665,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
       text.style.cursor = 'pointer';
       const selected = pendingMeridiem === label;
       text.style.fontWeight = selected ? 'bold' : 'normal';
-      text.style.fill = selected ? '#111' : '#666';
+      text.style.fill = selected ? getCssVariable('--svg-center-text-main', '#111') : getCssVariable('--svg-center-text-day', '#666');
 
       text.addEventListener('click', (e) => {
         e.preventDefault();
@@ -509,23 +681,32 @@ export function createCalendarRenderer(svgElement, options = {}) {
   };
 
   const showHourSelection = (skipStatePush = false) => {
-    clearTimeSelectionView();
     activeView = 'hours';
     // Track view state (unless we're restoring from Escape)
     if (!skipStatePush && !isRestoringView) {
       viewStateManager.pushView('hours', {});
     }
 
+    // Get current view group
+    const currentViewGroup = svg.querySelector('.day-segments-group, .hour-segments-group, .minute-segments-group');
+    
+    // Clear other time views if not transitioning from them
+    if (!currentViewGroup || !currentViewGroup.classList.contains('day-segments-group')) {
+      clearTimeSelectionView();
+    }
+
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     group.setAttribute('class', 'hour-segments-group');
     setAriaRole(group, 'group');
 
-    const count = useTwelveHourClock ? 12 : 24;
-    const degreesPer = 360 / count;
-    const outerRadiusRatio = 0.62;
-    const innerRadius = radius * 0.34;
+    // Render function that builds the hour selection view
+    const renderHourSelectionView = () => {
+      const count = useTwelveHourClock ? 12 : 24;
+      const degreesPer = 360 / count;
+      const outerRadiusRatio = 0.62;
+      const innerRadius = radius * 0.34;
 
-    for (let i = 0; i < count; i++) {
+      for (let i = 0; i < count; i++) {
       const displayHour = useTwelveHourClock ? (i + 1) : i;
       const startingAngle = -degreesToRadians(degreesPer * i) + degreesToRadians(45);
       const arcSize = degreesToRadians(degreesPer);
@@ -533,8 +714,8 @@ export function createCalendarRenderer(svgElement, options = {}) {
 
       const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       path.setAttribute('d', createArcPath(centerX, centerY, radius, startingAngle, endingAngle, outerRadiusRatio, innerRadius));
-      path.setAttribute('fill', '#f7f7f7');
-      path.setAttribute('stroke', '#ddd');
+      path.setAttribute('fill', getCssVariable('--svg-day-bg', '#f7f7f7'));
+      path.setAttribute('stroke', getCssVariable('--svg-stroke', getDarkMode() ? '#444' : '#ddd'));
       path.setAttribute('stroke-width', '1');
       path.setAttribute('class', 'hour-segment');
       path.setAttribute('data-hour', String(displayHour));
@@ -545,14 +726,13 @@ export function createCalendarRenderer(svgElement, options = {}) {
       setAriaLabel(path, generateHourLabel(displayHour, useTwelveHourClock, pendingMeridiem));
 
       path.addEventListener('mouseenter', (e) => {
-        e.target.setAttribute('fill', '#eee');
+        e.target.setAttribute('fill', getCssVariable('--svg-day-bg-hover', '#eee'));
       });
       path.addEventListener('mouseleave', (e) => {
-        e.target.setAttribute('fill', '#f7f7f7');
+        e.target.setAttribute('fill', getCssVariable('--svg-day-bg', '#f7f7f7'));
       });
 
-      path.addEventListener('click', (e) => {
-        e.preventDefault();
+      const handleHourActivation = () => {
         const hourValue = Number(path.getAttribute('data-hour'));
         if (!Number.isFinite(hourValue)) return;
 
@@ -564,6 +744,35 @@ export function createCalendarRenderer(svgElement, options = {}) {
         }
 
         showMinuteSelection();
+      };
+
+      path.addEventListener('click', (e) => {
+        e.preventDefault();
+        handleHourActivation();
+      });
+
+      // Make keyboard accessible
+      makeSvgElementFocusable(path, {
+        onActivate: handleHourActivation,
+        onArrowKey: (direction) => {
+          const nextIndex = handleArrowKeyNavigation(direction, i, count);
+          const allHourPaths = Array.from(group.querySelectorAll('.hour-segment'));
+          if (allHourPaths[nextIndex]) {
+            allHourPaths[nextIndex].focus();
+          }
+        },
+        onHome: () => {
+          const allHourPaths = Array.from(group.querySelectorAll('.hour-segment'));
+          if (allHourPaths[0]) {
+            allHourPaths[0].focus();
+          }
+        },
+        onEnd: () => {
+          const allHourPaths = Array.from(group.querySelectorAll('.hour-segment'));
+          if (allHourPaths[count - 1]) {
+            allHourPaths[count - 1].focus();
+          }
+        }
       });
 
       group.appendChild(path);
@@ -589,39 +798,96 @@ export function createCalendarRenderer(svgElement, options = {}) {
       text.style.fontFamily = 'Helvetica, Arial, sans-serif';
       text.style.fontWeight = 'bold';
       text.style.pointerEvents = 'none';
-      text.style.fill = '#333';
+      text.style.fill = getCssVariable('--svg-center-text-day', '#333');
       group.appendChild(text);
     }
 
     svg.appendChild(group);
     announceToScreenReader('Hour selection', svg);
 
-    if (useTwelveHourClock) {
-      renderAmPmSelector();
+      if (useTwelveHourClock) {
+        renderAmPmSelector();
+      }
+      
+      // Manage focus after rendering
+      setTimeout(() => {
+        if (isRestoringView) {
+          // Restore focus when going back
+          const restored = manageFocusTransition(null, 'hours', {
+            container: svg,
+            selector: '.hour-segment',
+            restoreFromView: 'hours'
+          });
+          if (!restored) {
+            // Fallback to first element if restore failed
+            const firstHourPath = group.querySelector('.hour-segment');
+            if (firstHourPath) {
+              firstHourPath.focus();
+            }
+          }
+        } else {
+          // Focus first hour segment when going forward
+          const firstHourPath = group.querySelector('.hour-segment');
+          if (firstHourPath) {
+            firstHourPath.focus();
+          }
+        }
+      }, 0);
+    };
+
+    // Save current focus before transitioning (if going forward from day selection)
+    const isComingFromDaySelection = currentViewGroup && currentViewGroup.classList.contains('day-segments-group');
+    if (!isRestoringView && isComingFromDaySelection) {
+      manageFocusTransition('monthDays', 'hours', {
+        container: svg,
+        selector: '.hour-segment'
+      });
+    }
+
+    // Use transition if there's a current view, otherwise render directly
+    if (currentViewGroup && currentViewGroup.classList.contains('day-segments-group')) {
+      transitionToView(currentViewGroup, group, svg, 'forward', renderHourSelectionView);
+    } else {
+      renderHourSelectionView();
+      // Add entered class for initial render
+      group.classList.add('entered');
     }
   };
 
   const showMinuteSelection = (skipStatePush = false) => {
-    removeIfPresent('.minute-segments-group');
-    removeIfPresent('.hour-segments-group');
-    removeIfPresent('.ampm-selector-group');
     activeView = 'minutes';
     // Track view state (unless we're restoring from Escape)
     if (!skipStatePush && !isRestoringView) {
       viewStateManager.pushView('minutes', {});
     }
 
+    // Get current view group
+    const currentViewGroup = svg.querySelector('.hour-segments-group, .minute-segments-group');
+    
+    // Clear other time views if not transitioning from them
+    if (!currentViewGroup || !currentViewGroup.classList.contains('hour-segments-group')) {
+      removeIfPresent('.minute-segments-group');
+      removeIfPresent('.hour-segments-group');
+      removeIfPresent('.ampm-selector-group');
+    } else {
+      // Only clear minute and ampm if transitioning from hour view
+      removeIfPresent('.minute-segments-group');
+      removeIfPresent('.ampm-selector-group');
+    }
+
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     group.setAttribute('class', 'minute-segments-group');
     setAriaRole(group, 'group');
 
-    const minutes = Array.from({ length: 12 }, (_, i) => i * 5);
-    const count = minutes.length;
-    const degreesPer = 360 / count;
-    const outerRadiusRatio = 0.78;
-    const innerRadius = radius * 0.52;
+    // Render function that builds the minute selection view
+    const renderMinuteSelectionView = () => {
+      const minutes = Array.from({ length: 12 }, (_, i) => i * 5);
+      const count = minutes.length;
+      const degreesPer = 360 / count;
+      const outerRadiusRatio = 0.78;
+      const innerRadius = radius * 0.52;
 
-    for (let i = 0; i < count; i++) {
+      for (let i = 0; i < count; i++) {
       const minute = minutes[i];
       const startingAngle = -degreesToRadians(degreesPer * i) + degreesToRadians(45);
       const arcSize = degreesToRadians(degreesPer);
@@ -629,8 +895,8 @@ export function createCalendarRenderer(svgElement, options = {}) {
 
       const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       path.setAttribute('d', createArcPath(centerX, centerY, radius, startingAngle, endingAngle, outerRadiusRatio, innerRadius));
-      path.setAttribute('fill', '#ffffff');
-      path.setAttribute('stroke', '#ddd');
+      path.setAttribute('fill', getCssVariable('--svg-time-bg', '#ffffff'));
+      path.setAttribute('stroke', getCssVariable('--svg-stroke', getDarkMode() ? '#444' : '#ddd'));
       path.setAttribute('stroke-width', '1');
       path.setAttribute('class', 'minute-segment');
       path.setAttribute('data-minute', String(minute));
@@ -641,14 +907,13 @@ export function createCalendarRenderer(svgElement, options = {}) {
       setAriaLabel(path, generateMinuteLabel(pendingHour24, minute, useTwelveHourClock, pendingMeridiem));
 
       path.addEventListener('mouseenter', (e) => {
-        e.target.setAttribute('fill', '#f1f1f1');
+        e.target.setAttribute('fill', getCssVariable('--svg-time-bg-hover', '#f1f1f1'));
       });
       path.addEventListener('mouseleave', (e) => {
-        e.target.setAttribute('fill', '#ffffff');
+        e.target.setAttribute('fill', getCssVariable('--svg-time-bg', '#ffffff'));
       });
 
-      path.addEventListener('click', (e) => {
-        e.preventDefault();
+      const handleMinuteActivation = () => {
         if (!pendingDate) return;
         const minuteValue = Number(path.getAttribute('data-minute'));
         if (!Number.isFinite(minuteValue)) return;
@@ -678,6 +943,35 @@ export function createCalendarRenderer(svgElement, options = {}) {
         drawCalendar();
         drawCircle();
         selectDate(final);
+      };
+
+      path.addEventListener('click', (e) => {
+        e.preventDefault();
+        handleMinuteActivation();
+      });
+
+      // Make keyboard accessible
+      makeSvgElementFocusable(path, {
+        onActivate: handleMinuteActivation,
+        onArrowKey: (direction) => {
+          const nextIndex = handleArrowKeyNavigation(direction, i, count);
+          const allMinutePaths = Array.from(group.querySelectorAll('.minute-segment'));
+          if (allMinutePaths[nextIndex]) {
+            allMinutePaths[nextIndex].focus();
+          }
+        },
+        onHome: () => {
+          const allMinutePaths = Array.from(group.querySelectorAll('.minute-segment'));
+          if (allMinutePaths[0]) {
+            allMinutePaths[0].focus();
+          }
+        },
+        onEnd: () => {
+          const allMinutePaths = Array.from(group.querySelectorAll('.minute-segment'));
+          if (allMinutePaths[count - 1]) {
+            allMinutePaths[count - 1].focus();
+          }
+        }
       });
 
       group.appendChild(path);
@@ -709,12 +1003,56 @@ export function createCalendarRenderer(svgElement, options = {}) {
       text.style.fontFamily = 'Helvetica, Arial, sans-serif';
       text.style.fontWeight = minute === 0 || minute === 30 ? 'bold' : 'normal';
       text.style.pointerEvents = 'none';
-      text.style.fill = '#333';
+      text.style.fill = getCssVariable('--svg-center-text-day', '#333');
       group.appendChild(text);
+      }
+
+      svg.appendChild(group);
+      announceToScreenReader('Minute selection', svg);
+      
+      // Manage focus after rendering
+      setTimeout(() => {
+        if (isRestoringView) {
+          // Restore focus when going back
+          const restored = manageFocusTransition(null, 'minutes', {
+            container: svg,
+            selector: '.minute-segment',
+            restoreFromView: 'minutes'
+          });
+          if (!restored) {
+            // Fallback to first element if restore failed
+            const firstMinutePath = group.querySelector('.minute-segment');
+            if (firstMinutePath) {
+              firstMinutePath.focus();
+            }
+          }
+        } else {
+          // Focus first minute segment when going forward
+          const firstMinutePath = group.querySelector('.minute-segment');
+          if (firstMinutePath) {
+            firstMinutePath.focus();
+          }
+        }
+      }, 0);
+    };
+
+    // Save current focus before transitioning (if going forward from hour selection)
+    const isComingFromHourSelection = currentViewGroup && currentViewGroup.classList.contains('hour-segments-group');
+    if (!isRestoringView && isComingFromHourSelection) {
+      manageFocusTransition('hours', 'minutes', {
+        container: svg,
+        selector: '.minute-segment'
+      });
     }
 
-    svg.appendChild(group);
-    announceToScreenReader('Minute selection', svg);
+    // Use transition if there's a current view, otherwise render directly
+    if (currentViewGroup && currentViewGroup.classList.contains('hour-segments-group')) {
+      transitionToView(currentViewGroup, group, svg, 'forward', renderMinuteSelectionView);
+    } else {
+      renderMinuteSelectionView();
+      // Add entered class for initial render
+      group.classList.add('entered');
+    }
   };
 
   const drawCircle = () => {
@@ -729,7 +1067,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
     circle.setAttribute('cx', centerX);
     circle.setAttribute('cy', centerY);
     circle.setAttribute('r', innerRadius);
-    circle.setAttribute('fill', '#ffffff');
+    circle.setAttribute('fill', getCssVariable('--card-bg', '#ffffff'));
     circle.setAttribute('class', 'center-circle');
 
     svg.appendChild(circle);
@@ -762,7 +1100,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
       dayText.textContent = dayOfWeek;
       dayText.style.fontSize = `${smallFontSize}px`;
       dayText.style.fontFamily = 'Helvetica, Arial, sans-serif';
-      dayText.style.fill = '#333';
+      dayText.style.fill = getCssVariable('--svg-center-text-day', '#333');
       svg.appendChild(dayText);
     }
 
@@ -782,7 +1120,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
     mainText.textContent = textContent;
     mainText.style.fontSize = `${mainFontSize}px`;
     mainText.style.fontFamily = 'Helvetica, Arial, sans-serif';
-    mainText.style.fill = '#333';
+    mainText.style.fill = getCssVariable('--svg-center-text-main', '#333');
     svg.appendChild(mainText);
 
     if (date) {
@@ -797,7 +1135,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
       yearText.textContent = year.toString();
       yearText.style.fontSize = `${smallFontSize}px`;
       yearText.style.fontFamily = 'Helvetica, Arial, sans-serif';
-      yearText.style.fill = '#333';
+      yearText.style.fill = getCssVariable('--svg-center-text-day', '#333');
       svg.appendChild(yearText);
 
       const moonPhaseName = getMoonPhaseName(date);
@@ -812,7 +1150,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
       moonPhaseText.textContent = moonPhaseName;
       moonPhaseText.style.fontSize = `${smallFontSize}px`;
       moonPhaseText.style.fontFamily = 'Helvetica, Arial, sans-serif';
-      moonPhaseText.style.fill = '#666';
+      moonPhaseText.style.fill = getCssVariable('--svg-center-text-moon', '#666');
       svg.appendChild(moonPhaseText);
     }
   };
@@ -1094,8 +1432,12 @@ export function createCalendarRenderer(svgElement, options = {}) {
     showSunAndMoon(sunPos, moonPos, true, moonPhase);
   };
 
+  // Track currently selected date for navigation functions
+  let currentSelectedDate = new Date();
+
   const selectDate = (date) => {
     const safeDate = createSafeDateCopy(date);
+    currentSelectedDate = safeDate; // Track selected date
     
     // Validate date
     const validation = validateDate(safeDate, validationOptions);
@@ -1156,8 +1498,106 @@ export function createCalendarRenderer(svgElement, options = {}) {
     }
   };
 
+  const goToToday = () => {
+    const today = new Date();
+    const todayYear = today.getFullYear();
+    
+    // Update year if needed
+    if (todayYear !== currentYear) {
+      setYear(todayYear);
+      drawCalendar();
+      drawCircle();
+    }
+    
+    // Select today's date
+    selectDate(today);
+  };
+
+  // Set up touch gestures for swipe navigation
+  const setupTouchGestures = () => {
+    const callbacks = {
+      onSwipeLeft: () => {
+        const view = viewStateManager.getCurrentView();
+        if (view === 'year' || view === 'monthDays') {
+          navigateNextMonth();
+        } else if (view === 'hours') {
+          navigateNextDay();
+        }
+      },
+      onSwipeRight: () => {
+        const view = viewStateManager.getCurrentView();
+        if (view === 'year' || view === 'monthDays') {
+          navigatePreviousMonth();
+        } else if (view === 'hours') {
+          navigatePreviousDay();
+        }
+      }
+    };
+    setupSwipeGesture(svg, callbacks);
+  };
+
   // Ensure instance is initialised with given SVG.
   initRenderer(svgElement);
+  
+  // Set up touch gestures
+  setupTouchGestures();
+
+  // Navigation functions for keyboard and swipe gestures
+  const navigateNextMonth = () => {
+    if (!currentSelectedDate) return;
+    const nextMonth = new Date(currentSelectedDate);
+    nextMonth.setMonth(nextMonth.getMonth() + 1);
+    
+    if (nextMonth.getFullYear() !== currentYear) {
+      setYear(nextMonth.getFullYear());
+      drawCalendar();
+      drawCircle();
+    }
+    
+    selectDate(nextMonth);
+  };
+
+  const navigatePreviousMonth = () => {
+    if (!currentSelectedDate) return;
+    const prevMonth = new Date(currentSelectedDate);
+    prevMonth.setMonth(prevMonth.getMonth() - 1);
+    
+    if (prevMonth.getFullYear() !== currentYear) {
+      setYear(prevMonth.getFullYear());
+      drawCalendar();
+      drawCircle();
+    }
+    
+    selectDate(prevMonth);
+  };
+
+  const navigateNextDay = () => {
+    if (!currentSelectedDate) return;
+    const nextDay = new Date(currentSelectedDate);
+    nextDay.setDate(nextDay.getDate() + 1);
+    
+    if (nextDay.getFullYear() !== currentYear) {
+      setYear(nextDay.getFullYear());
+      drawCalendar();
+      drawCircle();
+    }
+    
+    selectDate(nextDay);
+  };
+
+  const navigatePreviousDay = () => {
+    if (!currentSelectedDate) return;
+    const prevDay = new Date(currentSelectedDate);
+    prevDay.setDate(prevDay.getDate() - 1);
+    
+    if (prevDay.getFullYear() !== currentYear) {
+      setYear(prevDay.getFullYear());
+      drawCalendar();
+      drawCircle();
+    }
+    
+    selectDate(prevDay);
+  };
 
   return {
     initRenderer,
@@ -1168,7 +1608,8 @@ export function createCalendarRenderer(svgElement, options = {}) {
     setTimeSelectionOptions,
     showSunAndMoonForDate,
     selectDate,
-    subscribeToDateChanges
+    subscribeToDateChanges,
+    goToToday
   };
 }
 
@@ -1215,5 +1656,9 @@ export function subscribeToDateChanges(listener) {
 
 export function setTimeSelectionOptions(options = {}) {
   return requireDefaultRenderer().setTimeSelectionOptions(options);
+}
+
+export function goToToday() {
+  return requireDefaultRenderer().goToToday();
 }
 

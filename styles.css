@@ -20,6 +20,150 @@ html {
   text-size-adjust: 100%;
 }
 
+/* CSS Variables for Light Mode */
+:root {
+  /* Background and text */
+  --bg-color: #f5f5f5;
+  --text-color: #333;
+  --text-color-secondary: #666;
+  --text-color-tertiary: #aaa;
+  
+  /* UI elements */
+  --input-bg: #fff;
+  --input-border: #ddd;
+  --input-border-focus: #48589a;
+  --card-bg: #fff;
+  --card-border: #e6e6e6;
+  --card-shadow: rgba(0, 0, 0, 0.04);
+  
+  /* Button colours */
+  --button-primary-bg: #48589a;
+  --button-primary-text: #fff;
+  --button-primary-hover: #3a4a7a;
+  --button-primary-active: #2d3a5f;
+  --button-disabled-bg: #999;
+  --button-disabled-border: #999;
+  
+  /* Month colours - light mode */
+  --month-jan: #48589a;
+  --month-feb: #275da4;
+  --month-mar: #3d8aae;
+  --month-apr: #659a8b;
+  --month-may: #9bb146;
+  --month-jun: #b6c741;
+  --month-jul: #dacd48;
+  --month-aug: #ecd344;
+  --month-sep: #fbb841;
+  --month-oct: #f88428;
+  --month-nov: #e55e34;
+  --month-dec: #99207a;
+  
+  /* Month hover colours - light mode */
+  --month-jan-hover: #7584c4;
+  --month-feb-hover: #5b9aee;
+  --month-mar-hover: #6db7d9;
+  --month-apr-hover: #7bb6a5;
+  --month-may-hover: #aac150;
+  --month-jun-hover: #b6c741;
+  --month-jul-hover: #dacd48;
+  --month-aug-hover: #ecd344;
+  --month-sep-hover: #fbb841;
+  --month-oct-hover: #fc994b;
+  --month-nov-hover: #ff9e80;
+  --month-dec-hover: #e273c6;
+  
+  /* SVG elements */
+  --svg-stroke: #fff;
+  --svg-center-text-main: #111;
+  --svg-center-text-day: #666;
+  --svg-center-text-moon: #666;
+  --svg-restricted-fill: #cccccc;
+  --svg-time-bg: #ffffff;
+  --svg-time-bg-hover: #f1f1f1;
+  --svg-day-bg: #f7f7f7;
+  --svg-day-bg-hover: #eee;
+  --svg-sun-fill: #ffd700;
+  --svg-moon-fill: #f5f5f5;
+  --svg-moon-shadow: #111;
+  
+  /* Other colours */
+  --restricted-date-bg: #cccccc;
+  --skip-link-bg: #48589a;
+  --skip-link-hover: #5b6ba8;
+}
+
+/* Dark Mode Variables */
+[data-theme="dark"] {
+  /* Background and text */
+  --bg-color: #1a1a1a;
+  --text-color: #e0e0e0;
+  --text-color-secondary: #b0b0b0;
+  --text-color-tertiary: #888;
+  
+  /* UI elements */
+  --input-bg: #2a2a2a;
+  --input-border: #444;
+  --input-border-focus: #6b7bb8;
+  --card-bg: #2a2a2a;
+  --card-border: #444;
+  --card-shadow: rgba(0, 0, 0, 0.3);
+  
+  /* Button colours */
+  --button-primary-bg: #6b7bb8;
+  --button-primary-text: #fff;
+  --button-primary-hover: #5b6ba8;
+  --button-primary-active: #4b5a98;
+  --button-disabled-bg: #666;
+  --button-disabled-border: #666;
+  
+  /* Month colours - dark mode */
+  --month-jan: #6b7bb8;
+  --month-feb: #4786d6;
+  --month-mar: #5ba8d6;
+  --month-apr: #83b8a9;
+  --month-may: #afc55a;
+  --month-jun: #cadb55;
+  --month-jul: #eee15c;
+  --month-aug: #f6dd58;
+  --month-sep: #fbcc55;
+  --month-oct: #fa983c;
+  --month-nov: #eb7248;
+  --month-dec: #b73e98;
+  
+  /* Month hover colours - dark mode */
+  --month-jan-hover: #7f8fcc;
+  --month-feb-hover: #5b9aea;
+  --month-mar-hover: #6fbcea;
+  --month-apr-hover: #97ccbd;
+  --month-may-hover: #c3d96e;
+  --month-jun-hover: #deef69;
+  --month-jul-hover: #f8eb70;
+  --month-aug-hover: #f6e76c;
+  --month-sep-hover: #fbd669;
+  --month-oct-hover: #faac50;
+  --month-nov-hover: #f5865c;
+  --month-dec-hover: #cb52ac;
+  
+  /* SVG elements */
+  --svg-stroke: #333;
+  --svg-center-text-main: #e0e0e0;
+  --svg-center-text-day: #b0b0b0;
+  --svg-center-text-moon: #b0b0b0;
+  --svg-restricted-fill: #666666;
+  --svg-time-bg: #333333;
+  --svg-time-bg-hover: #3a3a3a;
+  --svg-day-bg: #2a2a2a;
+  --svg-day-bg-hover: #333333;
+  --svg-sun-fill: #ffd700;
+  --svg-moon-fill: #e0e0e0;
+  --svg-moon-shadow: #111;
+  
+  /* Other colours */
+  --restricted-date-bg: #666666;
+  --skip-link-bg: #6b7bb8;
+  --skip-link-hover: #7f8fcc;
+}
+
 /* Body */
 body {
   margin: 0;
@@ -29,10 +173,11 @@ body {
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background-color: #f5f5f5;
+  background-color: var(--bg-color);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   line-height: 1.5;
-  color: #333;
+  color: var(--text-color);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Layout: circular calendar + month view */
@@ -59,17 +204,99 @@ body {
 
 #year-input {
   padding: 8px 12px;
-  border: 2px solid #ddd;
+  border: 2px solid var(--input-border);
   border-radius: 4px;
   font-size: 1rem;
   width: 100px;
-  text-align: center;
-  transition: border-color 0.2s ease;
+  background-color: var(--input-bg);
+  color: var(--text-color);
+  transition: border-color 0.2s ease, background-color 0.3s ease, color 0.3s ease;
+}
+
+#today-button {
+  padding: 8px 16px;
+  border: 2px solid var(--button-primary-bg);
+  border-radius: 4px;
+  font-size: 1rem;
+  background-color: var(--button-primary-bg);
+  color: var(--button-primary-text);
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+#today-button:hover {
+  background-color: var(--button-primary-hover);
+  border-color: var(--button-primary-hover);
+}
+
+#today-button:active {
+  background-color: var(--button-primary-active);
+  border-color: var(--button-primary-active);
+}
+
+#today-button:focus {
+  outline: 2px solid var(--button-primary-bg);
+  outline-offset: 2px;
+}
+
+#voice-toggle {
+  padding: 8px 16px;
+  border: 2px solid var(--button-primary-bg);
+  border-radius: 4px;
+  font-size: 1rem;
+  background-color: var(--button-primary-bg);
+  color: var(--button-primary-text);
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+#voice-toggle:hover:not(:disabled) {
+  background-color: var(--button-primary-hover);
+  border-color: var(--button-primary-hover);
+}
+
+#voice-toggle:active:not(:disabled) {
+  background-color: var(--button-primary-active);
+  border-color: var(--button-primary-active);
+}
+
+#voice-toggle:focus {
+  outline: 2px solid var(--button-primary-bg);
+  outline-offset: 2px;
+}
+
+#voice-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: var(--button-disabled-bg);
+  border-color: var(--button-disabled-border);
+}
+
+#voice-toggle.listening {
+  background-color: #d32f2f;
+  border-color: #d32f2f;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+#voice-toggle.listening:hover {
+  background-color: #b71c1c;
+  border-color: #b71c1c;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
 }
 
 #year-input:focus {
   outline: none;
-  border-color: #48589a;
+  border-color: var(--input-border-focus);
 }
 
 /* Calendar Container */
@@ -86,11 +313,12 @@ body {
 }
 
 .month-view {
-  background: #fff;
-  border: 1px solid #e6e6e6;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 10px;
   padding: 12px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 2px var(--card-shadow);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .month-view__heading {
@@ -107,34 +335,35 @@ body {
 .month-view__weekday {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #666;
+  color: var(--text-color-secondary);
   text-align: center;
   padding: 6px 0;
 }
 
 .month-view__day {
-  border: 1px solid #eee;
-  background: #fff;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
   border-radius: 8px;
   padding: 10px 0;
   text-align: center;
   font-size: 0.95rem;
   cursor: default;
-  color: #222;
+  color: var(--text-color);
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
 
 .month-view__day--outside {
-  color: #aaa;
-  background: #fafafa;
+  color: var(--text-color-tertiary);
+  background: var(--bg-color);
 }
 
 .month-view__day--today {
-  border-color: #48589a;
+  border-color: var(--month-jan);
 }
 
 .month-view__day--selected {
-  background: #48589a;
-  border-color: #48589a;
+  background: var(--month-jan);
+  border-color: var(--month-jan);
   color: #fff;
 }
 
@@ -169,6 +398,24 @@ body {
     font-weight: 500;
   }
   
+  .center-text--main {
+    font-weight: 600;
+    fill: var(--svg-center-text-main);
+    transition: fill 0.3s ease;
+  }
+  
+  .center-text--day {
+    font-weight: 500;
+    fill: var(--svg-center-text-day);
+    transition: fill 0.3s ease;
+  }
+  
+  .center-text--moon {
+    font-weight: 400;
+    fill: var(--svg-center-text-moon);
+    transition: fill 0.3s ease;
+  }
+  
   .sun-icon {
     opacity: 0.9;
     filter: drop-shadow(0 0 3px rgba(255, 215, 0, 0.5));
@@ -186,157 +433,157 @@ body {
   }
 }
 
-/* Month Colour Classes */
+/* Month Colour Classes - use CSS variables */
 .Jan-bg {
-  background-color: #48589a;
+  background-color: var(--month-jan);
 }
 
 .Jan-text {
-  color: #48589a;
+  color: var(--month-jan);
 }
 
 .Jan-bg-light {
-  background-color: #7584c4;
+  background-color: var(--month-jan-hover);
 }
 
 .Jan-text-light {
-  color: #7584c4;
+  color: var(--month-jan-hover);
 }
 
 .Feb-bg {
-  background-color: #275da4;
+  background-color: var(--month-feb);
 }
 
 .Feb-text {
-  color: #275da4;
+  color: var(--month-feb);
 }
 
 .Feb-bg-light {
-  background-color: #5b9aee;
+  background-color: var(--month-feb-hover);
 }
 
 .Feb-text-light {
-  color: #5b9aee;
+  color: var(--month-feb-hover);
 }
 
 .Mar-bg {
-  background-color: #3d8aae;
+  background-color: var(--month-mar);
 }
 
 .Mar-text {
-  color: #3d8aae;
+  color: var(--month-mar);
 }
 
 .Mar-bg-light {
-  background-color: #6db7d9;
+  background-color: var(--month-mar-hover);
 }
 
 .Mar-text-light {
-  color: #6db7d9;
+  color: var(--month-mar-hover);
 }
 
 .Apr-bg {
-  background-color: #659a8b;
+  background-color: var(--month-apr);
 }
 
 .Apr-text {
-  color: #659a8b;
+  color: var(--month-apr);
 }
 
 .Apr-bg-light {
-  background-color: #7bb6a5;
+  background-color: var(--month-apr-hover);
 }
 
 .Apr-text-light {
-  color: #7bb6a5;
+  color: var(--month-apr-hover);
 }
 
 .May-bg {
-  background-color: #9bb146;
+  background-color: var(--month-may);
 }
 
 .May-text {
-  color: #9bb146;
+  color: var(--month-may);
 }
 
 .Jun-bg {
-  background-color: #b6c741;
+  background-color: var(--month-jun);
 }
 
 .Jun-text {
-  color: #b6c741;
+  color: var(--month-jun);
 }
 
 .Jul-bg {
-  background-color: #dacd48;
+  background-color: var(--month-jul);
 }
 
 .Jul-text {
-  color: #dacd48;
+  color: var(--month-jul);
 }
 
 .Aug-bg {
-  background-color: #ecd344;
+  background-color: var(--month-aug);
 }
 
 .Aug-text {
-  color: #ecd344;
+  color: var(--month-aug);
 }
 
 .Sep-bg {
-  background-color: #fbb841;
+  background-color: var(--month-sep);
 }
 
 .Sep-text {
-  color: #fbb841;
+  color: var(--month-sep);
 }
 
 .Oct-bg {
-  background-color: #f88428;
+  background-color: var(--month-oct);
 }
 
 .Oct-text {
-  color: #f88428;
+  color: var(--month-oct);
 }
 
 .Nov-bg {
-  background-color: #e55e34;
+  background-color: var(--month-nov);
 }
 
 .Nov-text {
-  color: #e55e34;
+  color: var(--month-nov);
 }
 
 .Dec-bg {
-  background-color: #99207a;
+  background-color: var(--month-dec);
 }
 
 .Dec-text {
-  color: #99207a;
+  color: var(--month-dec);
 }
 
 .Oct-bg-light {
-  background-color: #fc994b;
+  background-color: var(--month-oct-hover);
 }
 
 .Oct-text-light {
-  color: #fc994b;
+  color: var(--month-oct-hover);
 }
 
 .Nov-bg-light {
-  background-color: #ff9e80;
+  background-color: var(--month-nov-hover);
 }
 
 .Nov-text-light {
-  color: #ff9e80;
+  color: var(--month-nov-hover);
 }
 
 .Dec-bg-light {
-  background-color: #e273c6;
+  background-color: var(--month-dec-hover);
 }
 
 .Dec-text-light {
-  color: #e273c6;
+  color: var(--month-dec-hover);
 }
 
 /* Month background padding */
@@ -431,6 +678,19 @@ body {
   opacity: 0.4;
 }
 
+/* Restricted/Disabled Date Styles */
+.day-segment--restricted {
+  opacity: 0.5 !important;
+  fill: var(--svg-restricted-fill) !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+}
+
+.day-segment--restricted:hover {
+  opacity: 0.5 !important;
+  fill: var(--svg-restricted-fill) !important;
+}
+
 /* Responsive adjustments */
 @media (max-width: 640px) {
   body {
@@ -452,3 +712,203 @@ body {
   }
 }
 
+/* Screen reader only - visually hidden but accessible */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Focus Management and Visual Indicators (Feature 03) */
+/* SVG Focus Indicators - visible on all devices */
+
+/* Focus indicators for all interactive SVG segments */
+#calendar-svg .calendar-segment:focus,
+#calendar-svg .calendar-segment.focused,
+#calendar-svg .day-segment:focus,
+#calendar-svg .day-segment.focused,
+#calendar-svg .hour-segment:focus,
+#calendar-svg .hour-segment.focused,
+#calendar-svg .minute-segment:focus,
+#calendar-svg .minute-segment.focused {
+  stroke: #0066cc;
+  stroke-width: 3px;
+  stroke-opacity: 1;
+  filter: drop-shadow(0 0 6px rgba(0, 102, 204, 0.9));
+  outline: none; /* SVG doesn't use outline */
+}
+
+/* High contrast mode support - WCAG 2.1 AA requires 3:1 contrast minimum */
+@media (prefers-contrast: high) {
+  #calendar-svg .calendar-segment:focus,
+  #calendar-svg .calendar-segment.focused,
+  #calendar-svg .day-segment:focus,
+  #calendar-svg .day-segment.focused,
+  #calendar-svg .hour-segment:focus,
+  #calendar-svg .hour-segment.focused,
+  #calendar-svg .minute-segment:focus,
+  #calendar-svg .minute-segment.focused {
+    stroke-width: 4px;
+    stroke: #000000;
+    filter: drop-shadow(0 0 8px rgba(0, 0, 0, 1));
+  }
+  
+  /* For light backgrounds in high contrast mode */
+  [data-theme="light"] #calendar-svg .calendar-segment:focus,
+  [data-theme="light"] #calendar-svg .calendar-segment.focused,
+  [data-theme="light"] #calendar-svg .day-segment:focus,
+  [data-theme="light"] #calendar-svg .day-segment.focused,
+  [data-theme="light"] #calendar-svg .hour-segment:focus,
+  [data-theme="light"] #calendar-svg .hour-segment.focused,
+  [data-theme="light"] #calendar-svg .minute-segment:focus,
+  [data-theme="light"] #calendar-svg .minute-segment.focused {
+    stroke: #0000ff;
+    filter: drop-shadow(0 0 8px rgba(0, 0, 255, 1));
+  }
+}
+
+/* Reduced motion - remove animations from focus indicators */
+@media (prefers-reduced-motion: reduce) {
+  #calendar-svg .calendar-segment:focus,
+  #calendar-svg .calendar-segment.focused,
+  #calendar-svg .day-segment:focus,
+  #calendar-svg .day-segment.focused,
+  #calendar-svg .hour-segment:focus,
+  #calendar-svg .hour-segment.focused,
+  #calendar-svg .minute-segment:focus,
+  #calendar-svg .minute-segment.focused {
+    filter: none; /* Remove drop-shadow animation effects */
+    transition: none; /* Remove any transitions */
+  }
+}
+
+/* Touch Target Size Compliance (WCAG 2.1 AA) */
+/* Ensure all interactive elements meet 44×44px minimum on touch devices */
+
+@media (pointer: coarse) {
+  /* Touch device styles - ensure adequate touch targets */
+  
+  /* Calendar segments should maintain adequate size */
+  /* Note: SVG paths use bounding box for touch targets */
+  /* Actual touch area is determined by the path geometry */
+  /* Minimum size is enforced via JavaScript measurement */
+
+  #calendar-svg .calendar-segment,
+  #calendar-svg .day-segment,
+  #calendar-svg .hour-segment,
+  #calendar-svg .minute-segment {
+    /* Ensure adequate hit area - increased stroke width helps with touch detection */
+    stroke-width: 2px;
+  }
+  
+  /* AM/PM selectors - ensure they're large enough */
+  #calendar-svg .ampm-selector {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 12px;
+    display: inline-block;
+    text-align: center;
+    line-height: 20px;
+    /* Increase touch area with padding */
+    box-sizing: border-box;
+  }
+  
+  /* Interactive SVG elements */
+  #calendar-svg [role="button"],
+  #calendar-svg [tabindex="0"] {
+    /* Ensure adequate touch target via increased stroke width */
+    stroke-width: 2px;
+  }
+}
+
+/* Skip Links */
+.skip-links {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  padding: 0;
+}
+
+.skip-link {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 12px 16px;
+  background: var(--skip-link-bg);
+  color: #fff;
+  text-decoration: none;
+  font-weight: 600;
+  border-radius: 0 0 4px 0;
+  transform: translateY(-100%);
+  transition: transform 0.2s ease, background-color 0.3s ease;
+  z-index: 1001;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+  outline: 3px solid #fff;
+  outline-offset: -3px;
+}
+
+.skip-link:hover {
+  background: var(--skip-link-hover);
+}
+
+.skip-link:not(:first-child) {
+  margin-top: 4px;
+}
+
+/* View Transitions */
+/* Base transition properties for calendar view groups */
+#calendar-svg .segments-group,
+#calendar-svg .day-segments-group,
+#calendar-svg .hour-segments-group,
+#calendar-svg .minute-segments-group {
+  transition: opacity 250ms ease-in-out, transform 250ms ease-in-out;
+  will-change: opacity, transform;
+}
+
+/* Entering state - new view fades in with slight scale */
+#calendar-svg .segments-group.entering,
+#calendar-svg .day-segments-group.entering,
+#calendar-svg .hour-segments-group.entering,
+#calendar-svg .minute-segments-group.entering {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+/* Entered state - fully visible */
+#calendar-svg .segments-group.entered,
+#calendar-svg .day-segments-group.entered,
+#calendar-svg .hour-segments-group.entered,
+#calendar-svg .minute-segments-group.entered {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Exiting state - current view fades out with slight scale */
+#calendar-svg .segments-group.exiting,
+#calendar-svg .day-segments-group.exiting,
+#calendar-svg .hour-segments-group.exiting,
+#calendar-svg .minute-segments-group.exiting {
+  opacity: 0;
+  transform: scale(1.05);
+}
+
+/* Respect prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  #calendar-svg .segments-group,
+  #calendar-svg .day-segments-group,
+  #calendar-svg .hour-segments-group,
+  #calendar-svg .minute-segments-group {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
