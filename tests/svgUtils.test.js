@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createArcPath, getMoonIlluminatedFraction, getMoonShadowDx } from '../src/utils/svgUtils.js';
+import { createArcPath, getMoonIlluminatedFraction, getMoonShadowDx, calculateTextRotation } from '../src/utils/svgUtils.js';
 
 describe('svgUtils', () => {
   describe('createArcPath', () => {
@@ -122,6 +122,75 @@ describe('svgUtils', () => {
 
     it('should wrap negative phases', () => {
       expect(getMoonShadowDx(10, -0.25)).toBeCloseTo(getMoonShadowDx(10, 0.75), 8);
+    });
+  });
+
+  describe('calculateTextRotation', () => {
+    const centerX = 100;
+    const centerY = 100;
+
+    it('should calculate rotation for text at top of circle (0 degrees)', () => {
+      const labelAngle = -Math.PI / 2; // -90° in calendar = top = 0° in standard = top-right, should NOT flip
+      const labelPos = [centerX, centerY - 50];
+      const rotation = calculateTextRotation(labelAngle, labelPos, centerX, centerY);
+      // Calendar -90° = Standard 0° = top-right quadrant, should NOT flip
+      // Base: -90° + 90° = 0°
+      expect(rotation).toBeCloseTo(0, 1);
+    });
+
+    it('should calculate rotation for text at right of circle', () => {
+      const labelAngle = 0; // 0° in calendar = right
+      const labelPos = [centerX + 50, centerY];
+      const rotation = calculateTextRotation(labelAngle, labelPos, centerX, centerY);
+      // Calendar 0° = Standard 90° = bottom-right quadrant, should flip
+      // Base: 0° + 90° = 90°, then + 180° = 270°
+      expect(rotation).toBeCloseTo(270, 1);
+    });
+
+    it('should not flip text on left side of circle (180-270 degrees)', () => {
+      const labelAngle = Math.PI;
+      const labelPos = [centerX - 50, centerY];
+      const rotation = calculateTextRotation(labelAngle, labelPos, centerX, centerY);
+      // Text at left-center: isLeft=true (on left side), should NOT flip
+      // Base: 180° + 90° = 270°
+      expect(rotation).toBeCloseTo(270, 1);
+    });
+
+    it('should flip text in bottom left quadrant', () => {
+      const labelAngle = (3 * Math.PI) / 4; // 135° in calendar = 225° in standard = bottom-left, should flip
+      const labelPos = [centerX - 35, centerY + 35];
+      const rotation = calculateTextRotation(labelAngle, labelPos, centerX, centerY);
+      // Calendar 135° = Standard 225° = bottom-left quadrant, should flip
+      // Base: 135° + 90° = 225°, then + 180° = 405°
+      expect(rotation).toBeCloseTo(405, 1);
+    });
+
+    it('should not flip text in top right quadrant', () => {
+      const labelAngle = -Math.PI / 4; // -45° in calendar = 45° in standard = top-right, should NOT flip
+      const labelPos = [centerX + 35, centerY - 35];
+      const rotation = calculateTextRotation(labelAngle, labelPos, centerX, centerY);
+      // Calendar -45° = Standard 45° = top-right quadrant, should NOT flip
+      // Base: -45° + 90° = 45°
+      expect(rotation).toBeCloseTo(45, 1);
+    });
+
+    it('should handle edge cases correctly', () => {
+      // Test various edge cases
+      const labelAngle = (7 * Math.PI) / 4; // 315 degrees
+      const labelPos = [centerX - 10, centerY + 48]; // Slightly left, bottom
+      const rotation = calculateTextRotation(labelAngle, labelPos, centerX, centerY);
+      // Should calculate a valid rotation
+      expect(typeof rotation).toBe('number');
+      expect(Number.isFinite(rotation)).toBe(true);
+    });
+
+    it('should handle text exactly at center horizontally', () => {
+      const labelAngle = Math.PI / 2;
+      const labelPos = [centerX, centerY - 50]; // Exactly at center x
+      const rotation = calculateTextRotation(labelAngle, labelPos, centerX);
+      // Should calculate a valid rotation
+      expect(typeof rotation).toBe('number');
+      expect(Number.isFinite(rotation)).toBe(true);
     });
   });
 });

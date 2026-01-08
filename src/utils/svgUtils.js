@@ -92,6 +92,51 @@ const createCirclePath = (centerX, centerY, radius) => {
 };
 
 /**
+ * Calculates the rotation angle for text positioned around a circle.
+ * Ensures text is always right-side up and readable from outside the circle.
+ * 
+ * The calendar uses an angle system with -90° offset (top = 0° in calendar, -90° in standard polar).
+ * Text should be readable from outside the circle.
+ * 
+ * @param {number} labelAngle - The angle in radians where the label is positioned (in calendar's coordinate system)
+ * @param {Array<number>} labelPos - [x, y] position of the label
+ * @param {number} centerX - X coordinate of the circle center
+ * @param {number} centerY - Y coordinate of the circle center (optional, defaults to centerX for square SVGs)
+ * @returns {number} Rotation angle in degrees for the SVG transform
+ */
+export function calculateTextRotation(labelAngle, labelPos, centerX, centerY = centerX) {
+  // Calculate base rotation to make text tangent to the circle
+  let textRotation = (labelAngle * 180 / Math.PI) + 90;
+  
+  // The calendar uses a -90° offset coordinate system
+  // Calendar: -90° = top, 0° = right, 90° = bottom, 180° = left
+  // Standard: 0° = right, 90° = bottom, 180° = left, 270° = top
+  // Convert calendar angle to standard angle for quadrant detection
+  const standardAngle = labelAngle + (Math.PI / 2); // Add 90° to convert
+  const standardAngleDeg = standardAngle * 180 / Math.PI;
+  
+  // Normalize to 0-360 range
+  let normalizedDeg = standardAngleDeg;
+  while (normalizedDeg < 0) normalizedDeg += 360;
+  while (normalizedDeg >= 360) normalizedDeg -= 360;
+  
+  // Determine quadrant in standard coordinates
+  // User reports: bottom-right (Apr, May, Jun) and bottom-left (Jul, Aug, Sep) are upside down
+  // Top-left and top-right (Jan, Feb, Mar) are correct
+  // So we need to flip bottom-right (90-180°) and bottom-left (180-270°)
+  const isBottomRight = normalizedDeg >= 90 && normalizedDeg < 180;
+  const isBottomLeft = normalizedDeg >= 180 && normalizedDeg < 270;
+  
+  if (isBottomRight || isBottomLeft) {
+    // Bottom-right or bottom-left: flip to fix upside-down text
+    textRotation += 180;
+  }
+  // Top-left and top-right: don't flip (these are already correct)
+  
+  return textRotation;
+}
+
+/**
  * Creates an SVG path for the illuminated portion of the moon.
  *
  * Phase is normalised so 0 = new, 0.25 = first quarter, 0.5 = full, 0.75 = last quarter.

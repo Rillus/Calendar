@@ -22,7 +22,7 @@ import {
 import { rgbToHex, getContrastColor } from '../utils/colorUtils.js';
 import { getThemeColor, getDarkMode } from '../utils/darkMode.js';
 import { degreesToRadians, sumTo, polarToCartesian } from '../utils/mathUtils.js';
-import { createArcPath, getMoonShadowDx } from '../utils/svgUtils.js';
+import { createArcPath, getMoonShadowDx, calculateTextRotation } from '../utils/svgUtils.js';
 import { getDaysInMonth } from '../utils/dateUtils.js';
 import { getMoonPhase, getMoonPhaseAngle, getMoonPhaseName } from '../utils/moonPhase.js';
 import { validateDate, isDateRestricted, createValidationOptions } from '../utils/dateValidation.js';
@@ -404,10 +404,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
         const labelRadius = radius * outerRadiusRatio * 0.95;
         const labelPos = polarToCartesian(centerX, centerY, labelRadius, labelAngle);
 
-        let textRotation = (labelAngle * 180 / Math.PI) + 90;
-        if (labelAngle > Math.PI / 2 && labelAngle < 3 * Math.PI / 2) {
-          textRotation += 180;
-        }
+        const textRotation = calculateTextRotation(labelAngle, labelPos, centerX, centerY);
 
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         text.setAttribute('x', labelPos[0]);
@@ -651,10 +648,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
         const labelRadius = radius * fullRadius * 0.95;
         const labelPos = polarToCartesian(centerX, centerY, labelRadius, labelAngle);
 
-        let textRotation = (labelAngle * 180 / Math.PI) + 90;
-        if (labelAngle > Math.PI / 2 && labelAngle < 3 * Math.PI / 2) {
-          textRotation += 180;
-        }
+        const textRotation = calculateTextRotation(labelAngle, labelPos, centerX, centerY);
 
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         text.setAttribute('x', labelPos[0]);
@@ -887,10 +881,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
         const labelRadius = radius * fullRadius * 0.95;
         const labelPos = polarToCartesian(centerX, centerY, labelRadius, labelAngle);
 
-        let textRotation = (labelAngle * 180 / Math.PI) + 90;
-        if (labelAngle > Math.PI / 2 && labelAngle < 3 * Math.PI / 2) {
-          textRotation += 180;
-        }
+        const textRotation = calculateTextRotation(labelAngle, labelPos, centerX, centerY);
 
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         text.setAttribute('x', labelPos[0]);
@@ -1121,10 +1112,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
       const labelRadius = radius * outerRadiusRatio * 0.90;
       const labelPos = polarToCartesian(centerX, centerY, labelRadius, labelAngle);
 
-      let textRotation = (labelAngle * 180 / Math.PI) + 90;
-      if (labelAngle > Math.PI / 2 && labelAngle < 3 * Math.PI / 2) {
-        textRotation += 180;
-      }
+      const textRotation = calculateTextRotation(labelAngle, labelPos, centerX);
 
       const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       text.setAttribute('x', labelPos[0]);
@@ -1330,10 +1318,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
       const labelRadius = radius * outerRadiusRatio * 0.92;
       const labelPos = polarToCartesian(centerX, centerY, labelRadius, labelAngle);
 
-      let textRotation = (labelAngle * 180 / Math.PI) + 90;
-      if (labelAngle > Math.PI / 2 && labelAngle < 3 * Math.PI / 2) {
-        textRotation += 180;
-      }
+      const textRotation = calculateTextRotation(labelAngle, labelPos, centerX);
 
       const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       text.setAttribute('x', labelPos[0]);
