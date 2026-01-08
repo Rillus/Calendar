@@ -4,6 +4,8 @@ import {
   setAriaRole,
   announceToScreenReader,
   setAriaCurrent,
+  setAriaExpanded,
+  setAriaHidden,
   createAriaLiveRegion,
   generateMonthLabel,
   generateDayLabel,
@@ -82,6 +84,62 @@ describe('ariaUtils', () => {
       setAriaCurrent(element, 'date');
       setAriaCurrent(element, null);
       expect(element.getAttribute('aria-current')).toBeNull();
+    });
+  });
+
+  describe('setAriaExpanded', () => {
+    it('should set aria-expanded attribute to true', () => {
+      const element = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      setAriaExpanded(element, true);
+      expect(element.getAttribute('aria-expanded')).toBe('true');
+    });
+
+    it('should set aria-expanded attribute to false', () => {
+      const element = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      setAriaExpanded(element, false);
+      expect(element.getAttribute('aria-expanded')).toBe('false');
+    });
+
+    it('should update existing aria-expanded', () => {
+      const element = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      setAriaExpanded(element, true);
+      setAriaExpanded(element, false);
+      expect(element.getAttribute('aria-expanded')).toBe('false');
+    });
+
+    it('should remove aria-expanded when set to null', () => {
+      const element = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      setAriaExpanded(element, true);
+      setAriaExpanded(element, null);
+      expect(element.getAttribute('aria-expanded')).toBeNull();
+    });
+  });
+
+  describe('setAriaHidden', () => {
+    it('should set aria-hidden attribute to true', () => {
+      const element = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      setAriaHidden(element, true);
+      expect(element.getAttribute('aria-hidden')).toBe('true');
+    });
+
+    it('should set aria-hidden attribute to false', () => {
+      const element = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      setAriaHidden(element, false);
+      expect(element.getAttribute('aria-hidden')).toBe('false');
+    });
+
+    it('should update existing aria-hidden', () => {
+      const element = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      setAriaHidden(element, true);
+      setAriaHidden(element, false);
+      expect(element.getAttribute('aria-hidden')).toBe('false');
+    });
+
+    it('should remove aria-hidden when set to null', () => {
+      const element = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      setAriaHidden(element, true);
+      setAriaHidden(element, null);
+      expect(element.getAttribute('aria-hidden')).toBeNull();
     });
   });
 

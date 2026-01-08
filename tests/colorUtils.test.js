@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { rgbToHex, rgbToRgbString, colourSum } from '../src/utils/colorUtils.js';
+import { rgbToHex, rgbToRgbString, colourSum, getContrastColor } from '../src/utils/colorUtils.js';
 
 describe('colorUtils', () => {
   describe('rgbToHex', () => {
@@ -144,6 +144,58 @@ describe('colorUtils', () => {
       expect(result.length).toBe(3);
       expect(result[0]).toBeGreaterThanOrEqual(0);
       expect(result[0]).toBeLessThanOrEqual(255);
+    });
+  });
+
+  describe('getContrastColor', () => {
+    it('should return white for dark colours', () => {
+      expect(getContrastColor([0, 0, 0])).toBe('#fff');
+      expect(getContrastColor([50, 50, 50])).toBe('#fff');
+      expect(getContrastColor([72, 88, 154])).toBe('#fff'); // JAN (dark)
+    });
+
+    it('should return black for light colours', () => {
+      expect(getContrastColor([255, 255, 255])).toBe('#000');
+      expect(getContrastColor([200, 200, 200])).toBe('#000');
+      expect(getContrastColor([238, 225, 92])).toBe('#000'); // JUL (light yellow)
+    });
+
+    it('should handle month colours correctly', () => {
+      // Dark colours should return white
+      expect(getContrastColor([72, 88, 154])).toBe('#fff'); // JAN
+      expect(getContrastColor([39, 93, 164])).toBe('#fff'); // FEB
+      expect(getContrastColor([153, 32, 122])).toBe('#fff'); // DEC
+      
+      // Light colours should return black (based on WCAG luminance)
+      expect(getContrastColor([238, 225, 92])).toBe('#000'); // JUL (light yellow - high luminance)
+    });
+
+    it('should handle dark mode month colours', () => {
+      // Dark mode colours are lighter, so should use black text for better contrast
+      expect(getContrastColor([107, 123, 184])).toBe('#fff'); // JAN dark mode (luminance below threshold)
+      expect(getContrastColor([238, 225, 92])).toBe('#000'); // JUL dark mode (high luminance)
+      expect(getContrastColor([250, 152, 60])).toBe('#000'); // OCT dark mode (luminance above threshold)
+    });
+
+    it('should handle edge cases', () => {
+      // Middle gray should default to white for better contrast on average
+      expect(getContrastColor([128, 128, 128])).toBe('#fff');
+      expect(getContrastColor([127, 127, 127])).toBe('#fff');
+    });
+
+    it('should always return either black or white', () => {
+      const colours = [
+        [0, 0, 0],
+        [128, 128, 128],
+        [255, 255, 255],
+        [100, 50, 200],
+        [200, 100, 50]
+      ];
+      
+      colours.forEach(colour => {
+        const result = getContrastColor(colour);
+        expect(['#000', '#fff']).toContain(result);
+      });
     });
   });
 });

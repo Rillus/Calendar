@@ -15,6 +15,8 @@
  * @param {Function} [options.onArrowKey] - Callback for arrow key navigation (direction: 'left'|'right'|'up'|'down')
  * @param {Function} [options.onHome] - Callback for Home key
  * @param {Function} [options.onEnd] - Callback for End key
+ * @param {Function} [options.onPageUp] - Callback for Page Up key
+ * @param {Function} [options.onPageDown] - Callback for Page Down key
  */
 export function makeSvgElementFocusable(element, options = {}) {
   const {
@@ -22,7 +24,9 @@ export function makeSvgElementFocusable(element, options = {}) {
     onActivate,
     onArrowKey,
     onHome,
-    onEnd
+    onEnd,
+    onPageUp,
+    onPageDown
   } = options;
 
   // Make element focusable
@@ -78,6 +82,24 @@ export function makeSvgElementFocusable(element, options = {}) {
       if (onEnd) {
         event.preventDefault();
         onEnd();
+      }
+      return;
+    }
+
+    // Handle Page Up key
+    if (key === 'PageUp') {
+      if (onPageUp) {
+        event.preventDefault();
+        onPageUp();
+      }
+      return;
+    }
+
+    // Handle Page Down key
+    if (key === 'PageDown') {
+      if (onPageDown) {
+        event.preventDefault();
+        onPageDown();
       }
       return;
     }
@@ -150,4 +172,176 @@ export function getPreviousSegmentIndex(currentIndex, totalSegments, wrap = true
     return wrap ? totalSegments - 1 : currentIndex;
   }
   return prev;
+}
+
+/**
+ * Handles arrow key navigation for year view (month segments)
+ * - Left/Right: Previous/next month (clockwise/counter-clockwise)
+ * - Up/Down: 6 months (opposite side)
+ * - Home: First month (January, index 0)
+ * - End: Last month (December, index 11)
+ * 
+ * @param {string} direction - Direction of navigation ('left'|'right'|'up'|'down'|'home'|'end')
+ * @param {number} currentIndex - Current month index (0-11)
+ * @param {number} totalSegments - Total number of months (12)
+ * @returns {number} - New month index
+ */
+export function handleYearViewNavigation(direction, currentIndex, totalSegments) {
+  if (direction === 'home') {
+    return 0;
+  }
+  
+  if (direction === 'end') {
+    return totalSegments - 1;
+  }
+  
+  if (direction === 'right') {
+    return getNextSegmentIndex(currentIndex, totalSegments, true);
+  }
+  
+  if (direction === 'left') {
+    return getPreviousSegmentIndex(currentIndex, totalSegments, true);
+  }
+  
+  // Up/Down: Move 6 months (opposite side)
+  if (direction === 'down') {
+    const newIndex = (currentIndex + 6) % totalSegments;
+    return newIndex;
+  }
+  
+  if (direction === 'up') {
+    const newIndex = (currentIndex - 6 + totalSegments) % totalSegments;
+    return newIndex;
+  }
+  
+  return currentIndex;
+}
+
+/**
+ * Handles arrow key navigation for day selection view
+ * - Left/Right: Previous/next day
+ * - Up/Down: Previous/next week (7 days)
+ * - Home: First day of month (index 0)
+ * - End: Last day of month
+ * 
+ * @param {string} direction - Direction of navigation ('left'|'right'|'up'|'down'|'home'|'end')
+ * @param {number} currentIndex - Current day index (0-based, where 0 = day 1)
+ * @param {number} totalSegments - Total number of days in month
+ * @returns {number} - New day index
+ */
+export function handleDaySelectionNavigation(direction, currentIndex, totalSegments) {
+  if (direction === 'home') {
+    return 0;
+  }
+  
+  if (direction === 'end') {
+    return totalSegments - 1;
+  }
+  
+  if (direction === 'right') {
+    return getNextSegmentIndex(currentIndex, totalSegments, true);
+  }
+  
+  if (direction === 'left') {
+    return getPreviousSegmentIndex(currentIndex, totalSegments, true);
+  }
+  
+  // Up/Down: Move 7 days (one week)
+  if (direction === 'down') {
+    const newIndex = (currentIndex + 7) % totalSegments;
+    return newIndex;
+  }
+  
+  if (direction === 'up') {
+    const newIndex = (currentIndex - 7 + totalSegments) % totalSegments;
+    return newIndex;
+  }
+  
+  return currentIndex;
+}
+
+/**
+ * Handles arrow key navigation for hour selection view
+ * - Left/Right: Previous/next hour
+ * - Up/Down: Previous/next 6 hours
+ * - Home: First hour (index 0)
+ * - End: Last hour (index 23)
+ * 
+ * @param {string} direction - Direction of navigation ('left'|'right'|'up'|'down'|'home'|'end')
+ * @param {number} currentIndex - Current hour index (0-23)
+ * @param {number} totalSegments - Total number of hours (24)
+ * @returns {number} - New hour index
+ */
+export function handleHourSelectionNavigation(direction, currentIndex, totalSegments) {
+  if (direction === 'home') {
+    return 0;
+  }
+  
+  if (direction === 'end') {
+    return totalSegments - 1;
+  }
+  
+  if (direction === 'right') {
+    return getNextSegmentIndex(currentIndex, totalSegments, true);
+  }
+  
+  if (direction === 'left') {
+    return getPreviousSegmentIndex(currentIndex, totalSegments, true);
+  }
+  
+  // Up/Down: Move 6 hours
+  if (direction === 'down') {
+    const newIndex = (currentIndex + 6) % totalSegments;
+    return newIndex;
+  }
+  
+  if (direction === 'up') {
+    const newIndex = (currentIndex - 6 + totalSegments) % totalSegments;
+    return newIndex;
+  }
+  
+  return currentIndex;
+}
+
+/**
+ * Handles arrow key navigation for minute selection view
+ * - Left/Right: Previous/next minute
+ * - Up/Down: Previous/next 15 minutes
+ * - Home: First minute (index 0)
+ * - End: Last minute (index 59)
+ * 
+ * @param {string} direction - Direction of navigation ('left'|'right'|'up'|'down'|'home'|'end')
+ * @param {number} currentIndex - Current minute index (0-59)
+ * @param {number} totalSegments - Total number of minutes (60)
+ * @returns {number} - New minute index
+ */
+export function handleMinuteSelectionNavigation(direction, currentIndex, totalSegments) {
+  if (direction === 'home') {
+    return 0;
+  }
+  
+  if (direction === 'end') {
+    return totalSegments - 1;
+  }
+  
+  if (direction === 'right') {
+    return getNextSegmentIndex(currentIndex, totalSegments, true);
+  }
+  
+  if (direction === 'left') {
+    return getPreviousSegmentIndex(currentIndex, totalSegments, true);
+  }
+  
+  // Up/Down: Move 15 minutes
+  if (direction === 'down') {
+    const newIndex = (currentIndex + 15) % totalSegments;
+    return newIndex;
+  }
+  
+  if (direction === 'up') {
+    const newIndex = (currentIndex - 15 + totalSegments) % totalSegments;
+    return newIndex;
+  }
+  
+  return currentIndex;
 }

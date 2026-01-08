@@ -377,7 +377,9 @@ body {
 /* SVG Elements */
 #calendar-svg {
   .calendar-segment {
-    transition: opacity 0.2s ease;
+    transition: opacity 0.2s ease, fill 0.2s ease, transform 0.2s ease;
+    transform-origin: center;
+    will-change: transform, opacity, fill;
     
     &:hover {
       opacity: 0.9;
@@ -430,6 +432,119 @@ body {
     pointer-events: none;
     opacity: 0.9;
     filter: drop-shadow(0 0 2px rgba(128, 128, 128, 0.5));
+  }
+}
+
+/* Animation and Micro-interactions (Feature 22) */
+
+/* Pulse animation for selections */
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+/* Ripple effect animation */
+@keyframes ripple {
+  0% {
+    r: 0;
+    opacity: 0.5;
+  }
+  100% {
+    r: var(--ripple-max-radius, 50);
+    opacity: 0;
+  }
+}
+
+/* Hover scale effect */
+#calendar-svg .calendar-segment.hover-scale,
+#calendar-svg .day-segment.hover-scale,
+#calendar-svg .hour-segment.hover-scale,
+#calendar-svg .minute-segment.hover-scale {
+  transition: transform 0.2s ease, opacity 0.2s ease, fill 0.2s ease;
+  transform-origin: center;
+}
+
+#calendar-svg .calendar-segment.hover-scale:hover,
+#calendar-svg .day-segment.hover-scale:hover,
+#calendar-svg .hour-segment.hover-scale:hover,
+#calendar-svg .minute-segment.hover-scale:hover {
+  transform: scale(1.02);
+}
+
+/* Pulse animation class */
+#calendar-svg .calendar-segment.pulse-animation,
+#calendar-svg .day-segment.pulse-animation,
+#calendar-svg .hour-segment.pulse-animation,
+#calendar-svg .minute-segment.pulse-animation {
+  animation: pulse 0.3s ease-in-out;
+}
+
+/* Ripple effect */
+#calendar-svg .ripple-effect {
+  pointer-events: none;
+  animation: ripple 0.6s ease-out;
+}
+
+/* Smooth colour transitions for all segments */
+#calendar-svg .calendar-segment,
+#calendar-svg .day-segment,
+#calendar-svg .hour-segment,
+#calendar-svg .minute-segment {
+  transition: fill 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+}
+
+/* Enhanced hover effects with smooth transitions */
+#calendar-svg .calendar-segment:hover,
+#calendar-svg .day-segment:hover,
+#calendar-svg .hour-segment:hover,
+#calendar-svg .minute-segment:hover {
+  transition: fill 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+}
+
+/* Month view day button animations */
+.month-view__day {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+  transform-origin: center;
+}
+
+.month-view__day:hover:not(.month-view__day--outside) {
+  transform: scale(1.05);
+}
+
+.month-view__day--selected {
+  animation: pulse 0.3s ease-in-out;
+}
+
+/* Respect prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  #calendar-svg .calendar-segment,
+  #calendar-svg .day-segment,
+  #calendar-svg .hour-segment,
+  #calendar-svg .minute-segment,
+  .month-view__day {
+    animation: none !important;
+    transition: none !important;
+  }
+  
+  #calendar-svg .calendar-segment.hover-scale:hover,
+  #calendar-svg .day-segment.hover-scale:hover,
+  #calendar-svg .hour-segment.hover-scale:hover,
+  #calendar-svg .minute-segment.hover-scale:hover,
+  .month-view__day:hover {
+    transform: none !important;
+  }
+  
+  #calendar-svg .pulse-animation,
+  .month-view__day--selected {
+    animation: none !important;
+  }
+  
+  #calendar-svg .ripple-effect {
+    display: none !important;
   }
 }
 

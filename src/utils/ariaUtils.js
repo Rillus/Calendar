@@ -43,6 +43,32 @@ export function setAriaCurrent(element, value) {
 }
 
 /**
+ * Sets the aria-expanded attribute on an element
+ * @param {SVGElement} element - The SVG element to set the expanded state on
+ * @param {boolean|null} value - The expanded state (true/false) or null to remove
+ */
+export function setAriaExpanded(element, value) {
+  if (value === null) {
+    element.removeAttribute('aria-expanded');
+  } else {
+    element.setAttribute('aria-expanded', String(value));
+  }
+}
+
+/**
+ * Sets the aria-hidden attribute on an element
+ * @param {SVGElement} element - The SVG element to set the hidden state on
+ * @param {boolean|null} value - The hidden state (true/false) or null to remove
+ */
+export function setAriaHidden(element, value) {
+  if (value === null) {
+    element.removeAttribute('aria-hidden');
+  } else {
+    element.setAttribute('aria-hidden', String(value));
+  }
+}
+
+/**
  * Creates an ARIA live region for screen reader announcements
  * @param {SVGElement} svg - The SVG element to append the live region to
  * @returns {SVGTextElement} The created live region element

@@ -3,6 +3,7 @@
 /****************************/
 
 import { buildMonthViewModel } from '../utils/monthViewUtils.js';
+import { addPulseAnimation } from '../utils/animationUtils.js';
 
 const escapeHtml = (value) =>
   String(value)
@@ -83,6 +84,9 @@ export function renderMonthView(container, selectedDate, options = {}) {
       const isoDate = button.getAttribute('data-iso-date');
       const date = parseIsoDate(isoDate);
       if (!date) return;
+
+      // Add pulse animation on selection
+      addPulseAnimation(button);
 
       options.onSelectDate(date);
     };

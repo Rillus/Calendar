@@ -351,6 +351,7 @@ describe('calendarRenderer', () => {
       const yearSegments = mockSvg.querySelector('.segments-group');
       expect(yearSegments).not.toBeNull();
       expect(mockSvg.querySelector('.day-segments-group')).toBeNull();
+      expect(mockSvg.querySelector('.week-segments-group')).toBeNull();
       expect(mockSvg.querySelector('.sun-icon')).not.toBeNull();
 
       expect(seen.length).toBeGreaterThanOrEqual(1);
@@ -461,6 +462,19 @@ describe('calendarRenderer', () => {
         const segmentsGroup = mockSvg.querySelector('.segments-group');
         expect(segmentsGroup.getAttribute('role')).toBe('group');
       });
+
+      it('should have aria-expanded="false" on segments group (year view)', () => {
+        drawCalendar();
+        const segmentsGroup = mockSvg.querySelector('.segments-group');
+        expect(segmentsGroup.getAttribute('aria-expanded')).toBe('false');
+      });
+
+      it('should have aria-hidden="true" on decorative text labels', () => {
+        drawCalendar();
+        const segmentsGroup = mockSvg.querySelector('.segments-group');
+        const firstLabel = segmentsGroup.querySelector('text.segment-label');
+        expect(firstLabel.getAttribute('aria-hidden')).toBe('true');
+      });
     });
 
     describe('day segments', () => {
@@ -489,6 +503,17 @@ describe('calendarRenderer', () => {
       it('should have role="group" on day segments group', () => {
         const dayGroup = mockSvg.querySelector('.day-segments-group');
         expect(dayGroup.getAttribute('role')).toBe('group');
+      });
+
+      it('should have aria-expanded="true" on day segments group', () => {
+        const dayGroup = mockSvg.querySelector('.day-segments-group');
+        expect(dayGroup.getAttribute('aria-expanded')).toBe('true');
+      });
+
+      it('should have aria-hidden="true" on decorative day labels', () => {
+        const dayGroup = mockSvg.querySelector('.day-segments-group');
+        const firstLabel = dayGroup.querySelector('text.day-label');
+        expect(firstLabel.getAttribute('aria-hidden')).toBe('true');
       });
     });
 
@@ -520,6 +545,17 @@ describe('calendarRenderer', () => {
       it('should have role="group" on hour segments group', () => {
         const hourGroup = mockSvg.querySelector('.hour-segments-group');
         expect(hourGroup.getAttribute('role')).toBe('group');
+      });
+
+      it('should have aria-expanded="true" on hour segments group', () => {
+        const hourGroup = mockSvg.querySelector('.hour-segments-group');
+        expect(hourGroup.getAttribute('aria-expanded')).toBe('true');
+      });
+
+      it('should have aria-hidden="true" on decorative hour labels', () => {
+        const hourGroup = mockSvg.querySelector('.hour-segments-group');
+        const firstLabel = hourGroup.querySelector('text.hour-label');
+        expect(firstLabel.getAttribute('aria-hidden')).toBe('true');
       });
     });
 
@@ -553,6 +589,17 @@ describe('calendarRenderer', () => {
       it('should have role="group" on minute segments group', () => {
         const minuteGroup = mockSvg.querySelector('.minute-segments-group');
         expect(minuteGroup.getAttribute('role')).toBe('group');
+      });
+
+      it('should have aria-expanded="true" on minute segments group', () => {
+        const minuteGroup = mockSvg.querySelector('.minute-segments-group');
+        expect(minuteGroup.getAttribute('aria-expanded')).toBe('true');
+      });
+
+      it('should have aria-hidden="true" on decorative minute labels', () => {
+        const minuteGroup = mockSvg.querySelector('.minute-segments-group');
+        const firstLabel = minuteGroup.querySelector('text.minute-label');
+        expect(firstLabel.getAttribute('aria-hidden')).toBe('true');
       });
     });
 

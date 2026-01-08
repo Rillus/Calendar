@@ -19,7 +19,7 @@ import {
   moonDistance,
   padding
 } from '../config/config.js';
-import { rgbToHex } from '../utils/colorUtils.js';
+import { rgbToHex, getContrastColor } from '../utils/colorUtils.js';
 import { getThemeColor, getDarkMode } from '../utils/darkMode.js';
 import { degreesToRadians, sumTo, polarToCartesian } from '../utils/mathUtils.js';
 import { createArcPath, getMoonShadowDx } from '../utils/svgUtils.js';
@@ -32,6 +32,8 @@ import {
   setAriaRole,
   announceToScreenReader,
   setAriaCurrent,
+  setAriaExpanded,
+  setAriaHidden,
   createAriaLiveRegion,
   generateMonthLabel,
   generateDayLabel,
@@ -42,12 +44,22 @@ import { setupSwipeGesture, cleanupSwipeGesture } from '../utils/touchGestures.j
 import { transitionToView } from '../utils/viewTransitions.js';
 import {
   makeSvgElementFocusable,
-  handleArrowKeyNavigation
+  handleArrowKeyNavigation,
+  handleYearViewNavigation,
+  handleDaySelectionNavigation,
+  handleHourSelectionNavigation,
+  handleMinuteSelectionNavigation
 } from '../utils/keyboardNavigation.js';
 import {
   manageFocusTransition,
   focusFirstElement
 } from '../utils/focusManagement.js';
+import {
+  addPulseAnimation,
+  addRippleEffect,
+  addHoverScale
+} from '../utils/animationUtils.js';
+import { getWeekStartDate, getWeekDates } from '../utils/weekViewUtils.js';
 
 // Full month names for announcements (better for screen readers)
 const fullMonthNames = [
@@ -108,6 +120,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
   let activeMonthIndex = null;
   let timeSelectionEnabled = Boolean(options.timeSelectionEnabled);
   let useTwelveHourClock = normaliseTwelveHourClock(options.is12HourClock);
+  let weekViewEnabled = Boolean(options.weekViewEnabled);
   let pendingDate = null;
   let pendingMeridiem = 'AM'; // only used in 12h mode
   let pendingHour24 = 0;
@@ -138,6 +151,10 @@ export function createCalendarRenderer(svgElement, options = {}) {
 
   const clearDaySelectionView = () => {
     removeIfPresent('.day-segments-group');
+  };
+
+  const clearWeekView = () => {
+    removeIfPresent('.week-segments-group');
   };
 
   const clearTimeSelectionView = () => {
@@ -220,6 +237,12 @@ export function createCalendarRenderer(svgElement, options = {}) {
             showMonthDaySelection(previousView.context.monthIndex, true);
             // Focus will be restored in showMonthDaySelection
             break;
+          case 'week':
+            // Return to week view (without pushing to stack)
+            const weekDate = previousView.context.date ? new Date(previousView.context.date) : new Date();
+            showWeekView(weekDate, true);
+            // Focus will be restored in showWeekView
+            break;
           case 'hours':
             // Return to hour selection (without pushing to stack)
             showHourSelection(true);
@@ -255,6 +278,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
   const drawCalendar = () => {
     // Switching back to year view clears any day selection overlay.
     clearDaySelectionView();
+    clearWeekView();
     clearTimeSelectionView();
     activeView = 'year';
     activeMonthIndex = null;
@@ -262,12 +286,13 @@ export function createCalendarRenderer(svgElement, options = {}) {
     viewStateManager.viewStack = [];
 
     // Get current view group (could be any view type)
-    const currentViewGroup = svg.querySelector('.segments-group, .day-segments-group, .hour-segments-group, .minute-segments-group');
+    const currentViewGroup = svg.querySelector('.segments-group, .day-segments-group, .week-segments-group, .hour-segments-group, .minute-segments-group');
     
     // Create new segments group
     const segmentsGroupEl = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     segmentsGroupEl.setAttribute('class', 'segments-group');
     setAriaRole(segmentsGroupEl, 'group');
+    setAriaExpanded(segmentsGroupEl, false); // Year view is collapsed (not expanded into days)
 
     // Render function that builds the year view
     const renderYearView = () => {
@@ -316,6 +341,9 @@ export function createCalendarRenderer(svgElement, options = {}) {
         setAriaRole(path, 'button');
         setAriaLabel(path, generateMonthLabel(i, currentYear));
 
+        // Add hover scale effect
+        addHoverScale(path);
+
         path.addEventListener('mouseenter', (e) => {
           e.target.setAttribute('fill', hoverColourHex);
         });
@@ -325,6 +353,9 @@ export function createCalendarRenderer(svgElement, options = {}) {
 
         path.addEventListener('click', (e) => {
           e.preventDefault();
+          // Add ripple effect and pulse animation
+          addRippleEffect(path, e, svg);
+          addPulseAnimation(path);
           // Month tap/click switches to day selection view for that month.
           showMonthDaySelection(i);
         });
@@ -335,7 +366,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
             showMonthDaySelection(i);
           },
           onArrowKey: (direction) => {
-            const nextIndex = handleArrowKeyNavigation(direction, i, segments);
+            const nextIndex = handleYearViewNavigation(direction, i, segments);
             const nextPath = segmentsGroupEl.querySelector(`[data-segment-index="${nextIndex}"]`);
             if (nextPath) {
               nextPath.focus();
@@ -352,6 +383,18 @@ export function createCalendarRenderer(svgElement, options = {}) {
             if (lastPath) {
               lastPath.focus();
             }
+          },
+          onPageUp: () => {
+            // Page Up: Previous year
+            setYear(currentYear - 1);
+            drawCalendar();
+            drawCircle();
+          },
+          onPageDown: () => {
+            // Page Down: Next year
+            setYear(currentYear + 1);
+            drawCalendar();
+            drawCircle();
           }
         });
 
@@ -379,11 +422,13 @@ export function createCalendarRenderer(svgElement, options = {}) {
         text.style.fontFamily = 'Helvetica, Arial, sans-serif';
         text.style.fontWeight = 'bold';
         text.style.pointerEvents = 'none';
+        // Text label is decorative - ARIA info is on the path element
+        setAriaHidden(text, true);
 
-        if (i >= 3 && i <= 9) {
-          text.style.fill = getCssVariable('--svg-center-text-main', '#000');
-        } else {
-          text.style.fill = '#fff';
+        const contrastColor = getContrastColor(monthColor);
+        text.style.fill = contrastColor;
+        // Only add drop shadow for white text (dark backgrounds)
+        if (contrastColor === '#fff') {
           text.style.filter = 'drop-shadow(0px 0px 5px rgba(255, 255, 255, 0.2))';
         }
 
@@ -430,7 +475,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
     text.style.fontSize = '16px';
     text.style.fontFamily = 'Helvetica, Arial, sans-serif';
     text.style.fontWeight = 'bold';
-    text.style.fill = '#fff';
+    text.style.fill = getContrastColor(monthColour);
     svg.appendChild(text);
   };
 
@@ -443,31 +488,37 @@ export function createCalendarRenderer(svgElement, options = {}) {
     }
 
     // Get current view group
-    const currentViewGroup = svg.querySelector('.segments-group, .day-segments-group, .hour-segments-group, .minute-segments-group');
+    const currentViewGroup = svg.querySelector('.segments-group, .day-segments-group, .week-segments-group, .hour-segments-group, .minute-segments-group');
     
     // Clear other views (but not the one we're transitioning from)
     if (currentViewGroup) {
       if (currentViewGroup.classList.contains('segments-group')) {
         clearDaySelectionView();
+        clearWeekView();
         clearTimeSelectionView();
       } else if (currentViewGroup.classList.contains('day-segments-group')) {
+        clearWeekView();
+        clearTimeSelectionView();
+      } else if (currentViewGroup.classList.contains('week-segments-group')) {
         clearTimeSelectionView();
       }
     } else {
       clearYearView();
       clearDaySelectionView();
+      clearWeekView();
       clearTimeSelectionView();
     }
 
     const days = getDaysInMonth(monthIndex, currentYear);
     const monthColour = getThemeColor(monthColors[monthIndex], monthColorsDark[monthIndex]);
     const monthColourHex = rgbToHex(monthColour);
-    const dayLabelColour = (monthIndex >= 3 && monthIndex <= 9) ? getCssVariable('--svg-center-text-main', '#000') : '#fff';
+    const dayLabelColour = getContrastColor(monthColour);
 
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     group.setAttribute('class', 'day-segments-group');
     group.setAttribute('data-month-index', String(monthIndex));
     setAriaRole(group, 'group');
+    setAriaExpanded(group, true); // Day selection view is expanded (showing days)
 
     // Render function that builds the day selection view
     const renderDaySelectionView = () => {
@@ -506,6 +557,11 @@ export function createCalendarRenderer(svgElement, options = {}) {
         const dayLabel = generateDayLabel(day, monthIndex, currentYear);
         setAriaLabel(path, isRestricted ? `${dayLabel} (not available)` : dayLabel);
 
+        // Add hover scale effect (only for non-restricted dates)
+        if (!isRestricted) {
+          addHoverScale(path);
+        }
+
         const handleDayActivation = () => {
           // Prevent selection of restricted dates
           if (isRestricted) {
@@ -517,6 +573,14 @@ export function createCalendarRenderer(svgElement, options = {}) {
           }
           
           const selected = new Date(currentYear, monthIndex, day);
+          
+          // If week view is enabled, navigate to week view first
+          if (weekViewEnabled) {
+            showWeekView(selected);
+            return;
+          }
+          
+          // Otherwise, use the original behavior (direct to hour selection or date selection)
           if (timeSelectionEnabled) {
             pendingDate = selected;
             pendingMeridiem = 'AM';
@@ -534,6 +598,11 @@ export function createCalendarRenderer(svgElement, options = {}) {
 
         path.addEventListener('click', (e) => {
           e.preventDefault();
+          // Add ripple effect and pulse animation (only for non-restricted dates)
+          if (!isRestricted) {
+            addRippleEffect(path, e, svg);
+            addPulseAnimation(path);
+          }
           handleDayActivation();
         });
 
@@ -542,7 +611,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
           makeSvgElementFocusable(path, {
             onActivate: handleDayActivation,
             onArrowKey: (direction) => {
-              const nextDayIndex = handleArrowKeyNavigation(direction, i, days);
+              const nextDayIndex = handleDaySelectionNavigation(direction, i, days);
               const nextPath = group.querySelector(`[data-day="${nextDayIndex + 1}"]`);
               if (nextPath && !nextPath.classList.contains('day-segment--restricted')) {
                 nextPath.focus();
@@ -558,6 +627,18 @@ export function createCalendarRenderer(svgElement, options = {}) {
               const lastPath = group.querySelector(`[data-day="${days}"]`);
               if (lastPath && !lastPath.classList.contains('day-segment--restricted')) {
                 lastPath.focus();
+              }
+            },
+            onPageUp: () => {
+              // Page Up: Previous month
+              if (currentSelectedDate) {
+                navigatePreviousMonth();
+              }
+            },
+            onPageDown: () => {
+              // Page Down: Next month
+              if (currentSelectedDate) {
+                navigateNextMonth();
               }
             }
           });
@@ -592,6 +673,8 @@ export function createCalendarRenderer(svgElement, options = {}) {
         if (dayLabelColour === '#fff') {
           text.style.filter = 'drop-shadow(0px 0px 5px rgba(255, 255, 255, 0.2))';
         }
+        // Text label is decorative - ARIA info is on the path element
+        setAriaHidden(text, true);
 
         group.appendChild(text);
       }
@@ -645,6 +728,254 @@ export function createCalendarRenderer(svgElement, options = {}) {
     }
   };
 
+  const showWeekView = (date, skipStatePush = false) => {
+    activeView = 'week';
+    // Track view state (unless we're restoring from Escape)
+    if (!skipStatePush && !isRestoringView) {
+      viewStateManager.pushView('week', { date: date.getTime() });
+    }
+
+    // Get current view group
+    const currentViewGroup = svg.querySelector('.segments-group, .day-segments-group, .week-segments-group, .hour-segments-group, .minute-segments-group');
+    
+    // Clear other views
+    if (currentViewGroup) {
+      if (currentViewGroup.classList.contains('day-segments-group')) {
+        clearTimeSelectionView();
+      } else if (currentViewGroup.classList.contains('week-segments-group')) {
+        clearTimeSelectionView();
+      } else {
+        clearDaySelectionView();
+        clearTimeSelectionView();
+      }
+    } else {
+      clearYearView();
+      clearDaySelectionView();
+      clearTimeSelectionView();
+    }
+
+    const weekStart = getWeekStartDate(date);
+    const weekDates = getWeekDates(weekStart);
+    
+    // Use the month colour of the first day of the week
+    const firstDayMonthIndex = weekDates[0].getMonth();
+    const monthColour = getThemeColor(monthColors[firstDayMonthIndex], monthColorsDark[firstDayMonthIndex]);
+    const monthColourHex = rgbToHex(monthColour);
+    const dayLabelColour = getContrastColor(monthColour);
+
+    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('class', 'week-segments-group');
+    group.setAttribute('data-week-start', weekStart.toISOString());
+    setAriaRole(group, 'group');
+    setAriaExpanded(group, true); // Week view is expanded (showing days)
+
+    // Render function that builds the week view
+    const renderWeekView = () => {
+      const degreesPerDay = 360 / 7;
+      for (let i = 0; i < 7; i++) {
+        const dayDate = weekDates[i];
+        const day = dayDate.getDate();
+        const dayMonthIndex = dayDate.getMonth();
+        const dayYear = dayDate.getFullYear();
+        
+        const startingAngle = -degreesToRadians(degreesPerDay * i) + degreesToRadians(45);
+        const arcSize = degreesToRadians(degreesPerDay);
+        const endingAngle = startingAngle + arcSize;
+
+        const isRestricted = isDateRestricted(dayDate, validationOptions);
+
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', createArcPath(centerX, centerY, radius, startingAngle, endingAngle, fullRadius));
+        
+        // Apply visual styling for restricted dates
+        if (isRestricted) {
+          path.setAttribute('fill', getCssVariable('--svg-restricted-fill', '#cccccc'));
+          path.setAttribute('opacity', '0.5');
+          path.setAttribute('class', 'week-day-segment week-day-segment--restricted');
+          path.style.cursor = 'not-allowed';
+          path.setAttribute('aria-disabled', 'true');
+        } else {
+          // Use month colour for the day's month
+          const dayMonthColour = getThemeColor(monthColors[dayMonthIndex], monthColorsDark[dayMonthIndex]);
+          const dayMonthColourHex = rgbToHex(dayMonthColour);
+          path.setAttribute('fill', dayMonthColourHex);
+          path.setAttribute('class', 'week-day-segment');
+          path.style.cursor = 'pointer';
+        }
+        
+        path.setAttribute('stroke', getStrokeColor());
+        path.setAttribute('stroke-width', '1');
+        path.setAttribute('data-day', String(day));
+        path.setAttribute('data-date', dayDate.toISOString());
+        path.setAttribute('data-day-index', String(i));
+
+        // Add ARIA attributes
+        setAriaRole(path, 'button');
+        const dayLabel = generateDayLabel(day, dayMonthIndex, dayYear);
+        setAriaLabel(path, isRestricted ? `${dayLabel} (not available)` : dayLabel);
+
+        // Add hover scale effect (only for non-restricted dates)
+        if (!isRestricted) {
+          addHoverScale(path);
+        }
+
+        const handleWeekDayActivation = () => {
+          // Prevent selection of restricted dates
+          if (isRestricted) {
+            const validation = validateDate(dayDate, validationOptions);
+            if (!validation.valid) {
+              showErrorMessage(validation.error);
+            }
+            return;
+          }
+          
+          if (timeSelectionEnabled) {
+            pendingDate = dayDate;
+            pendingMeridiem = 'AM';
+            pendingHour24 = 0;
+            clearWeekView();
+            showHourSelection();
+            announceToScreenReader(`Selected ${fullMonthNames[dayMonthIndex]} ${day}, ${dayYear}`, svg);
+            return;
+          }
+
+          drawCalendar();
+          drawCircle();
+          selectDate(dayDate);
+        };
+
+        path.addEventListener('click', (e) => {
+          e.preventDefault();
+          // Add ripple effect and pulse animation (only for non-restricted dates)
+          if (!isRestricted) {
+            addRippleEffect(path, e, svg);
+            addPulseAnimation(path);
+          }
+          handleWeekDayActivation();
+        });
+
+        // Make keyboard accessible (only if not restricted)
+        if (!isRestricted) {
+          makeSvgElementFocusable(path, {
+            onActivate: handleWeekDayActivation,
+            onArrowKey: (direction) => {
+              const nextDayIndex = handleArrowKeyNavigation(direction, i, 7);
+              const nextPath = group.querySelector(`[data-day-index="${nextDayIndex}"]`);
+              if (nextPath && !nextPath.classList.contains('week-day-segment--restricted')) {
+                nextPath.focus();
+              }
+            },
+            onHome: () => {
+              const firstPath = group.querySelector('[data-day-index="0"]');
+              if (firstPath && !firstPath.classList.contains('week-day-segment--restricted')) {
+                firstPath.focus();
+              }
+            },
+            onEnd: () => {
+              const lastPath = group.querySelector('[data-day-index="6"]');
+              if (lastPath && !lastPath.classList.contains('week-day-segment--restricted')) {
+                lastPath.focus();
+              }
+            }
+          });
+        }
+
+        group.appendChild(path);
+
+        // Day number labels around the outside
+        const labelAngle = startingAngle + (arcSize / 2);
+        const labelRadius = radius * fullRadius * 0.95;
+        const labelPos = polarToCartesian(centerX, centerY, labelRadius, labelAngle);
+
+        let textRotation = (labelAngle * 180 / Math.PI) + 90;
+        if (labelAngle > Math.PI / 2 && labelAngle < 3 * Math.PI / 2) {
+          textRotation += 180;
+        }
+
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', labelPos[0]);
+        text.setAttribute('y', labelPos[1]);
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('dominant-baseline', 'middle');
+        text.setAttribute('transform', `rotate(${textRotation} ${labelPos[0]} ${labelPos[1]})`);
+        text.setAttribute('class', 'week-day-label');
+        text.setAttribute('data-day-index', String(i));
+        text.textContent = String(day);
+        text.style.fontSize = `${svgSize / 40}px`;
+        text.style.fontFamily = 'Helvetica, Arial, sans-serif';
+        text.style.fontWeight = 'bold';
+        text.style.pointerEvents = 'none';
+        text.style.fill = dayLabelColour;
+        if (dayLabelColour === '#fff') {
+          text.style.filter = 'drop-shadow(0px 0px 5px rgba(255, 255, 255, 0.2))';
+        }
+        // Text label is decorative - ARIA info is on the path element
+        setAriaHidden(text, true);
+
+        group.appendChild(text);
+      }
+
+      svg.appendChild(group);
+      
+      // Show week information in centre
+      const weekStartMonth = fullMonthNames[weekStart.getMonth()];
+      const weekStartDay = weekStart.getDate();
+      const weekEnd = weekDates[6];
+      const weekEndMonth = fullMonthNames[weekEnd.getMonth()];
+      const weekEndDay = weekEnd.getDate();
+      const weekYear = weekStart.getFullYear();
+      
+      const weekLabel = weekStartMonth === weekEndMonth
+        ? `${weekStartDay}-${weekEndDay} ${weekStartMonth} ${weekYear}`
+        : `${weekStartDay} ${weekStartMonth} - ${weekEndDay} ${weekEndMonth} ${weekYear}`;
+      
+      announceToScreenReader(`Week view, ${weekLabel}`, svg);
+      
+      // Manage focus after rendering
+      setTimeout(() => {
+        if (isRestoringView) {
+          // Restore focus when going back
+          const restored = manageFocusTransition(null, 'week', {
+            container: svg,
+            selector: '.week-day-segment:not(.week-day-segment--restricted)',
+            restoreFromView: 'week'
+          });
+          if (!restored) {
+            // Fallback to first element if restore failed
+            const firstDayPath = group.querySelector('.week-day-segment:not(.week-day-segment--restricted)');
+            if (firstDayPath) {
+              firstDayPath.focus();
+            }
+          }
+        } else {
+          // Focus first day segment when going forward
+          const firstDayPath = group.querySelector('.week-day-segment:not(.week-day-segment--restricted)');
+          if (firstDayPath) {
+            firstDayPath.focus();
+          }
+        }
+      }, 0);
+    };
+
+    // Save current focus before transitioning (if going forward from day selection)
+    const isComingFromDaySelection = currentViewGroup && currentViewGroup.classList.contains('day-segments-group');
+    if (!isRestoringView && isComingFromDaySelection) {
+      manageFocusTransition('monthDays', 'week', {
+        container: svg,
+        selector: '.week-day-segment:not(.week-day-segment--restricted)'
+      });
+    }
+
+    // Use transition if there's a current view, otherwise render directly
+    if (currentViewGroup && currentViewGroup.classList.contains('day-segments-group')) {
+      transitionToView(currentViewGroup, group, svg, 'forward', renderWeekView);
+    } else {
+      renderWeekView();
+      // Add entered class for initial render
+      group.classList.add('entered');
+    }
+  };
+
   const renderAmPmSelector = () => {
     removeIfPresent('.ampm-selector-group');
 
@@ -688,16 +1019,17 @@ export function createCalendarRenderer(svgElement, options = {}) {
     }
 
     // Get current view group
-    const currentViewGroup = svg.querySelector('.day-segments-group, .hour-segments-group, .minute-segments-group');
+    const currentViewGroup = svg.querySelector('.day-segments-group, .week-segments-group, .hour-segments-group, .minute-segments-group');
     
     // Clear other time views if not transitioning from them
-    if (!currentViewGroup || !currentViewGroup.classList.contains('day-segments-group')) {
+    if (!currentViewGroup || (!currentViewGroup.classList.contains('day-segments-group') && !currentViewGroup.classList.contains('week-segments-group'))) {
       clearTimeSelectionView();
     }
 
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     group.setAttribute('class', 'hour-segments-group');
     setAriaRole(group, 'group');
+    setAriaExpanded(group, true); // Hour selection view is expanded (showing hours)
 
     // Render function that builds the hour selection view
     const renderHourSelectionView = () => {
@@ -725,6 +1057,9 @@ export function createCalendarRenderer(svgElement, options = {}) {
       setAriaRole(path, 'button');
       setAriaLabel(path, generateHourLabel(displayHour, useTwelveHourClock, pendingMeridiem));
 
+      // Add hover scale effect
+      addHoverScale(path);
+
       path.addEventListener('mouseenter', (e) => {
         e.target.setAttribute('fill', getCssVariable('--svg-day-bg-hover', '#eee'));
       });
@@ -748,6 +1083,9 @@ export function createCalendarRenderer(svgElement, options = {}) {
 
       path.addEventListener('click', (e) => {
         e.preventDefault();
+        // Add ripple effect and pulse animation
+        addRippleEffect(path, e, svg);
+        addPulseAnimation(path);
         handleHourActivation();
       });
 
@@ -755,7 +1093,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
       makeSvgElementFocusable(path, {
         onActivate: handleHourActivation,
         onArrowKey: (direction) => {
-          const nextIndex = handleArrowKeyNavigation(direction, i, count);
+          const nextIndex = handleHourSelectionNavigation(direction, i, count);
           const allHourPaths = Array.from(group.querySelectorAll('.hour-segment'));
           if (allHourPaths[nextIndex]) {
             allHourPaths[nextIndex].focus();
@@ -799,6 +1137,8 @@ export function createCalendarRenderer(svgElement, options = {}) {
       text.style.fontWeight = 'bold';
       text.style.pointerEvents = 'none';
       text.style.fill = getCssVariable('--svg-center-text-day', '#333');
+      // Text label is decorative - ARIA info is on the path element
+      setAriaHidden(text, true);
       group.appendChild(text);
     }
 
@@ -835,10 +1175,10 @@ export function createCalendarRenderer(svgElement, options = {}) {
       }, 0);
     };
 
-    // Save current focus before transitioning (if going forward from day selection)
-    const isComingFromDaySelection = currentViewGroup && currentViewGroup.classList.contains('day-segments-group');
+    // Save current focus before transitioning (if going forward from day/week selection)
+    const isComingFromDaySelection = currentViewGroup && (currentViewGroup.classList.contains('day-segments-group') || currentViewGroup.classList.contains('week-segments-group'));
     if (!isRestoringView && isComingFromDaySelection) {
-      manageFocusTransition('monthDays', 'hours', {
+      manageFocusTransition('week', 'hours', {
         container: svg,
         selector: '.hour-segment'
       });
@@ -878,6 +1218,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     group.setAttribute('class', 'minute-segments-group');
     setAriaRole(group, 'group');
+    setAriaExpanded(group, true); // Minute selection view is expanded (showing minutes)
 
     // Render function that builds the minute selection view
     const renderMinuteSelectionView = () => {
@@ -905,6 +1246,9 @@ export function createCalendarRenderer(svgElement, options = {}) {
       // Add ARIA attributes
       setAriaRole(path, 'button');
       setAriaLabel(path, generateMinuteLabel(pendingHour24, minute, useTwelveHourClock, pendingMeridiem));
+
+      // Add hover scale effect
+      addHoverScale(path);
 
       path.addEventListener('mouseenter', (e) => {
         e.target.setAttribute('fill', getCssVariable('--svg-time-bg-hover', '#f1f1f1'));
@@ -947,6 +1291,9 @@ export function createCalendarRenderer(svgElement, options = {}) {
 
       path.addEventListener('click', (e) => {
         e.preventDefault();
+        // Add ripple effect and pulse animation
+        addRippleEffect(path, e, svg);
+        addPulseAnimation(path);
         handleMinuteActivation();
       });
 
@@ -954,7 +1301,7 @@ export function createCalendarRenderer(svgElement, options = {}) {
       makeSvgElementFocusable(path, {
         onActivate: handleMinuteActivation,
         onArrowKey: (direction) => {
-          const nextIndex = handleArrowKeyNavigation(direction, i, count);
+          const nextIndex = handleMinuteSelectionNavigation(direction, i, count);
           const allMinutePaths = Array.from(group.querySelectorAll('.minute-segment'));
           if (allMinutePaths[nextIndex]) {
             allMinutePaths[nextIndex].focus();
@@ -1004,6 +1351,8 @@ export function createCalendarRenderer(svgElement, options = {}) {
       text.style.fontWeight = minute === 0 || minute === 30 ? 'bold' : 'normal';
       text.style.pointerEvents = 'none';
       text.style.fill = getCssVariable('--svg-center-text-day', '#333');
+      // Text label is decorative - ARIA info is on the path element
+      setAriaHidden(text, true);
       group.appendChild(text);
       }
 
