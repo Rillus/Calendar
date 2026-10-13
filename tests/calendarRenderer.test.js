@@ -551,6 +551,39 @@ describe('calendarRenderer', () => {
       expect(mockSvg.querySelector('.segments-group')).toBeNull();
       expect(mockSvg.querySelector('.day-segments-group')).not.toBeNull();
     });
+
+    it('should not notify twice for one drag move after redrawCalendar', () => {
+      mockSvg.getBoundingClientRect = () => ({
+        left: 0,
+        top: 0,
+        width: svgSize,
+        height: svgSize,
+        right: svgSize,
+        bottom: svgSize,
+        x: 0,
+        y: 0,
+        toJSON() { return {}; }
+      });
+
+      setYear(2026);
+      selectDate(new Date(2026, 0, 15));
+      drawCalendar();
+
+      const seen = [];
+      const unsubscribe = subscribeToDateChanges((date) => seen.push(date));
+
+      const segmentsGroup = mockSvg.querySelector('.segments-group');
+      expect(segmentsGroup).not.toBeNull();
+
+      const centre = svgSize / 2;
+      segmentsGroup.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: centre + 100, clientY: centre }));
+      document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: centre, clientY: centre + 100 }));
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+
+      unsubscribe();
+
+      expect(seen.length).toBe(1);
+    });
   });
 });
 

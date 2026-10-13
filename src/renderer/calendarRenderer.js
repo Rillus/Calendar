@@ -47,6 +47,13 @@ export function createCalendarRenderer(svgElement) {
   let moonClipIdCounter = 0;
   let activeView = 'year';
   let activeMonthIndex = null;
+  let yearRingDragAbort = null;
+  let monthDayRingDragAbort = null;
+
+  const abortDragListeners = (controller) => {
+    controller?.abort();
+    return null;
+  };
 
   const getEventPos = (e) => {
     if (e.touches && e.touches.length > 0) {
@@ -168,10 +175,12 @@ export function createCalendarRenderer(svgElement) {
   };
 
   const clearDaySelectionView = () => {
+    monthDayRingDragAbort = abortDragListeners(monthDayRingDragAbort);
     removeIfPresent('.day-segments-group');
   };
 
   const clearYearView = () => {
+    yearRingDragAbort = abortDragListeners(yearRingDragAbort);
     removeIfPresent('.segments-group');
   };
 
@@ -192,6 +201,8 @@ export function createCalendarRenderer(svgElement) {
     clearDaySelectionView();
     activeView = 'year';
     activeMonthIndex = null;
+
+    yearRingDragAbort = abortDragListeners(yearRingDragAbort);
 
     const segmentsGroup = svg.querySelector('.segments-group');
     if (segmentsGroup) {
@@ -352,6 +363,11 @@ export function createCalendarRenderer(svgElement) {
   };
 
   const setupMonthDayRingDragHandlers = (dayGroup, monthIndex, days) => {
+    monthDayRingDragAbort = abortDragListeners(monthDayRingDragAbort);
+    const dragAbort = new AbortController();
+    monthDayRingDragAbort = dragAbort;
+    const { signal } = dragAbort;
+
     let isDragging = false;
     let isDragActive = false;
     let didDrag = false;
@@ -406,8 +422,8 @@ export function createCalendarRenderer(svgElement) {
       if (didDrag) suppressNextClick = true;
     };
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('mousemove', handleMouseMove, { signal });
+    document.addEventListener('mouseup', handleMouseUp, { signal });
 
     dayGroup.addEventListener('touchstart', (e) => {
       isDragging = true;
@@ -416,7 +432,7 @@ export function createCalendarRenderer(svgElement) {
       startPointerAngle = getAngleFromEvent(e);
       startRotation = rotation;
       // Don't preventDefault here: it can suppress the synthetic click on tap.
-    }, { passive: false });
+    }, { passive: false, signal });
 
     document.addEventListener('touchmove', (e) => {
       if (!isDragging) return;
@@ -432,13 +448,13 @@ export function createCalendarRenderer(svgElement) {
       }
       applyRotation(startRotation + delta);
       e.preventDefault();
-    }, { passive: false });
+    }, { passive: false, signal });
 
     document.addEventListener('touchend', () => {
       if (!isDragging) return;
       isDragging = false;
       if (didDrag) suppressNextClick = true;
-    }, { passive: true });
+    }, { passive: true, signal });
 
     // If the user dragged the ring, suppress the next click so it doesn't "pick a day" accidentally.
     dayGroup.addEventListener('click', (e) => {
@@ -454,6 +470,11 @@ export function createCalendarRenderer(svgElement) {
 
   const setupYearRingDragHandlers = (segmentsGroup) => {
     if (!segmentsGroup) return;
+    yearRingDragAbort = abortDragListeners(yearRingDragAbort);
+    const dragAbort = new AbortController();
+    yearRingDragAbort = dragAbort;
+    const { signal } = dragAbort;
+
     let isPointerDown = false;
     let startPointerAngle = 0;
     let startRotation = 0;
@@ -514,8 +535,8 @@ export function createCalendarRenderer(svgElement) {
       if (didDrag) suppressNextClick = true;
     };
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('mousemove', handleMouseMove, { signal });
+    document.addEventListener('mouseup', handleMouseUp, { signal });
 
     segmentsGroup.addEventListener('touchstart', (e) => {
       isPointerDown = true;
@@ -524,7 +545,7 @@ export function createCalendarRenderer(svgElement) {
       startPointerAngle = getAngleFromEvent(e);
       startRotation = yearRingRotation;
       // Don't preventDefault here: it can suppress the synthetic click on tap.
-    }, { passive: false });
+    }, { passive: false, signal });
 
     document.addEventListener('touchmove', (e) => {
       if (!isPointerDown) return;
@@ -538,20 +559,20 @@ export function createCalendarRenderer(svgElement) {
       didDrag = true;
       applyRotation(startRotation + delta);
       e.preventDefault();
-    }, { passive: false });
+    }, { passive: false, signal });
 
     document.addEventListener('touchend', () => {
       if (!isPointerDown) return;
       isPointerDown = false;
       if (didDrag) suppressNextClick = true;
-    }, { passive: true });
+    }, { passive: true, signal });
 
     segmentsGroup.addEventListener('click', (e) => {
       if (!suppressNextClick) return;
       suppressNextClick = false;
       e.preventDefault();
       e.stopPropagation();
-    }, { capture: true });
+    }, { capture: true, signal });
 
     segmentsGroup.style.cursor = 'grab';
     segmentsGroup.style.pointerEvents = 'all';
@@ -767,47 +788,7 @@ export function createCalendarRenderer(svgElement) {
     const updateSunPosition = (angle) => {
       currentSunAngle = normaliseRadians(angle);
       const angleForMapping = normaliseRadians(currentSunAngle - yearRingRotation);
-      const segmentStartAngles = [];
-      for (let i = 0; i < segments; i++) {
-        const startAngle = -degreesToRadians(sumTo(data, i)) + degreesToRadians(45);
-        let normalized = startAngle;
-        while (normalized < 0) normalized += 2 * Math.PI;
-        while (normalized >= 2 * Math.PI) normalized -= 2 * Math.PI;
-        segmentStartAngles.push({ month: i, angle: normalized });
-      }
-
-      let monthIndex = 0;
-      let angleInSegment = 0;
-
-      for (let i = 0; i < segmentStartAngles.length; i++) {
-        const currentStart = segmentStartAngles[i].angle;
-        let segmentEnd = currentStart + degreesToRadians(deg);
-        if (segmentEnd > 2 * Math.PI) {
-          segmentEnd -= 2 * Math.PI;
-        }
-
-        let inSegment = false;
-        if (currentStart < segmentEnd) {
-          inSegment = angleForMapping >= currentStart && angleForMapping < segmentEnd;
-        } else {
-          inSegment = angleForMapping >= currentStart || angleForMapping < segmentEnd;
-        }
-
-        if (inSegment) {
-          monthIndex = segmentStartAngles[i].month;
-          angleInSegment = angleForMapping - currentStart;
-          if (angleInSegment < 0) {
-            angleInSegment += 2 * Math.PI;
-          }
-          break;
-        }
-      }
-
-      const segmentSize = degreesToRadians(deg);
-      angleInSegment = Math.max(0, Math.min(angleInSegment, segmentSize));
-      const positionInSegment = 1 - (angleInSegment / segmentSize);
-      const daysInMonth = getDaysInMonth(monthIndex, currentYear);
-      const dayInMonth = Math.max(1, Math.min(daysInMonth, Math.floor(positionInSegment * daysInMonth) + 1));
+      const { monthIndex, dayInMonth } = getMonthDayForAngleInYear(angleForMapping);
 
       const date = new Date(currentYear, monthIndex, dayInMonth);
       writeSegmentName(labels[monthIndex], date);
